@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FilePress</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-900 text-white flex items-center justify-center h-screen">
+
+<div class="bg-gray-800 p-8 rounded-xl text-center w-96">
+  <h1 class="text-xl font-bold mb-4">Image Compressor 🚀</h1>
+
+  <input type="file" id="fileInput" class="mb-4 w-full text-black p-2 rounded" />
+
+  <button onclick="uploadImage()" class="bg-blue-500 px-4 py-2 rounded w-full">
+    Compress Image
+  </button>
+
+  <p id="status" class="mt-4"></p>
+
+  <img id="preview" class="mt-4 hidden" />
+  <a id="download" class="hidden text-green-400 block mt-2">Download</a>
+</div>
+
+<script>
+async function uploadImage() {
+  const file = document.getElementById("fileInput").files[0];
+  const status = document.getElementById("status");
+
+  if (!file) {
+    status.innerText = "Select an image first";
+    return;
+  }
+
+  status.innerText = "Uploading & compressing...";
+
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", "YOUR_UPLOAD_PRESET");
+
+  const res = await fetch("https://api.cloudinary.com/v1_1/YOUR_CLOUD_NAME/image/upload", {
+    method: "POST",
+    body: formData
+  });
+
+  const data = await res.json();
+
+  const optimizedUrl = data.secure_url.replace("/upload/", "/upload/q_auto,f_auto/");
+
+  document.getElementById("preview").src = optimizedUrl;
+  document.getElementById("preview").classList.remove("hidden");
+
+  const download = document.getElementById("download");
+  download.href = optimizedUrl;
+  download.classList.remove("hidden");
+
+  status.innerText = "Done!";
+}
+</script>
+
+</body>
+</html>
