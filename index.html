@@ -1,0 +1,336 @@
+```html
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<title>QuickCompress | Pro File Tools</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0f172a">
+
+<!-- External Libraries -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { 
+    darkMode: 'class',
+    theme: {
+      extend: {
+        animation: { 'fade-in-up': 'fadeInUp 0.5s ease-out forwards' },
+        keyframes: {
+          fadeInUp: {
+            '0%': { opacity: '0', transform: 'translateY(20px)' },
+            '100%': { opacity: '1', transform: 'translateY(0)' }
+          }
+        }
+      }
+    }
+  }
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+  body { font-family: system-ui, -apple-system, sans-serif; scroll-behavior: smooth; }
+  
+  /* Glassmorphism Nav */
+  .glass-nav { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); }
+  .dark .glass-nav { background: rgba(15, 23, 42, 0.8); border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+
+  /* Navigation Links */
+  .nav-link { transition: all 0.3s; position: relative; padding: 0.5rem 0; cursor: pointer; font-weight: 500; }
+  .nav-link:hover { color: #3b82f6; }
+  .nav-link.active { color: #3b82f6; font-weight: 700; }
+  .nav-link.active::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 100%; height: 3px; background: linear-gradient(to right, #3b82f6, #8b5cf6); border-radius: 3px; }
+
+  /* SPA View Switching */
+  .page-view { display: none; opacity: 0; }
+  .page-view.active { display: block; opacity: 1; animation: fadeInUp 0.4s ease-out forwards; }
+
+  /* Interactive Drop Zones */
+  .file-drop-zone { border: 2px dashed #475569; transition: all 0.3s ease; background: rgba(0,0,0,0.02); }
+  .dark .file-drop-zone { background: rgba(255,255,255,0.02); }
+  .file-drop-zone.drag-active { border-color: #3b82f6; background: rgba(59, 130, 246, 0.1); transform: scale(1.02); }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: #0f172a; }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+  /* Toast Notifications */
+  .toast { transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55), opacity 0.3s; }
+</style>
+</head>
+
+<body class="bg-gray-50 text-gray-900 dark:bg-slate-900 dark:text-white min-h-screen flex flex-col transition-colors duration-300">
+
+<!-- Toast Notification Container -->
+<div id="toastContainer" class="fixed bottom-4 right-4 z-[60] flex flex-col gap-2 pointer-events-none"></div>
+
+<header class="glass-nav sticky top-0 z-50 transition-colors duration-300 shadow-sm">
+  <nav class="max-w-7xl mx-auto p-4 flex flex-wrap justify-between items-center gap-4">
+    <a href="#home" class="font-extrabold text-2xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-purple-600">QuickCompress</a>
+    
+    <div class="flex flex-wrap justify-center gap-4 md:gap-8 text-sm items-center">
+      <a href="#home" class="nav-link" data-target="home">Home</a>
+      <a href="#compress" class="nav-link" data-target="compress">Compress</a>
+      <a href="#convert" class="nav-link" data-target="convert">Convert</a>
+      <a href="#pdf" class="nav-link" data-target="pdf">To PDF</a>
+      
+      <!-- Credit UI -->
+      <div class="bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 px-4 py-2 rounded-full font-bold flex items-center gap-2 text-xs md:text-sm shadow-sm border border-gray-200 dark:border-slate-700">
+        <span>⚡</span> <span id="creditCounter">5</span> Credits
+      </div>
+
+      <button onclick="toggleTheme()" class="p-2.5 rounded-full bg-white dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors shadow-sm border border-gray-200 dark:border-slate-700" aria-label="Toggle Theme">
+        <span id="themeIcon">🌙</span>
+      </button>
+    </div>
+  </nav>
+</header>
+
+<main class="flex-grow w-full pb-20 overflow-x-hidden">
+
+  <!-- Home View -->
+  <section id="home" class="page-view active">
+    <div class="text-center mt-16 md:mt-24 px-4 max-w-4xl mx-auto">
+      <div class="inline-block mb-4 px-4 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-bold tracking-wide">V2.0 NOW LIVE</div>
+      <h1 class="text-5xl md:text-7xl font-extrabold mb-6 leading-tight tracking-tight">
+        Master Your <br/>
+        <span class="bg-clip-text text-transparent bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600">Digital Assets.</span>
+      </h1>
+      <p class="text-gray-600 dark:text-slate-400 mb-10 text-lg md:text-xl max-w-2xl mx-auto">Browser-native batch processing, dimensional resizing, and secure document generation. Zero server uploads required for local tools.</p>
+      
+      <div class="flex flex-wrap justify-center gap-4">
+        <a href="#compress" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-full font-bold text-lg shadow-lg shadow-blue-500/30 transition-all hover:-translate-y-1">Start Compressing</a>
+        <a href="#convert" class="bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white border border-gray-200 dark:border-slate-700 px-8 py-4 rounded-full font-bold text-lg shadow-sm transition-all hover:-translate-y-1">Batch Convert</a>
+      </div>
+    </div>
+
+    <!-- Interactive Tool Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 max-w-6xl mx-auto mt-16">
+      <a href="#compress" class="group bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-sm hover:shadow-xl transition-all border border-gray-200 dark:border-slate-700 block cursor-pointer text-left relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-bl-full -z-10 transition-transform group-hover:scale-110"></div>
+        <div class="w-14 h-14 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-2xl flex items-center justify-center text-2xl mb-6 shadow-sm">🗜️</div>
+        <h2 class="font-bold text-xl mb-2 text-gray-900 dark:text-white">Cloud Compressor</h2>
+        <p class="text-gray-500 dark:text-slate-400 text-sm leading-relaxed">Shrink images up to 80% without visible quality loss using Cloudinary's AI engine.</p>
+      </a>
+      <a href="#convert" class="group bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-sm hover:shadow-xl transition-all border border-gray-200 dark:border-slate-700 block cursor-pointer text-left relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-bl-full -z-10 transition-transform group-hover:scale-110"></div>
+        <div class="w-14 h-14 bg-purple-100 dark:bg-purple-900/30 text-purple-600 rounded-2xl flex items-center justify-center text-2xl mb-6 shadow-sm">🔄</div>
+        <h2 class="font-bold text-xl mb-2 text-gray-900 dark:text-white">Format Shifter</h2>
+        <p class="text-gray-500 dark:text-slate-400 text-sm leading-relaxed">Convert formats locally. Adjust dimensions and output massive batches as a ZIP file.</p>
+      </a>
+      <a href="#pdf" class="group bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-sm hover:shadow-xl transition-all border border-gray-200 dark:border-slate-700 block cursor-pointer text-left relative overflow-hidden">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/10 rounded-bl-full -z-10 transition-transform group-hover:scale-110"></div>
+        <div class="w-14 h-14 bg-red-100 dark:bg-red-900/30 text-red-600 rounded-2xl flex items-center justify-center text-2xl mb-6 shadow-sm">📄</div>
+        <h2 class="font-bold text-xl mb-2 text-gray-900 dark:text-white">Document Builder</h2>
+        <p class="text-gray-500 dark:text-slate-400 text-sm leading-relaxed">Compile multiple receipts or images into a clean, formatted PDF document instantly.</p>
+      </a>
+    </div>
+  </section>
+
+  <!-- Compress View -->
+  <section id="compress" class="page-view">
+    <div class="flex flex-col items-center mt-12 px-4">
+      <div class="text-center mb-8">
+        <h1 class="text-4xl font-extrabold mb-3">Cloud Compression</h1>
+        <p class="text-gray-500 dark:text-slate-400 max-w-md mx-auto">Upload heavy image files to drastically reduce their file size.</p>
+      </div>
+
+      <div class="bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-xl w-full max-w-lg border border-gray-200 dark:border-slate-700">
+        
+        <div id="compressDropZone" class="file-drop-zone p-10 mb-6 rounded-2xl relative cursor-pointer text-center group" onclick="document.getElementById('compressInput').click()">
+          <div class="w-16 h-16 bg-gray-100 dark:bg-slate-700 rounded-full flex items-center justify-center text-2xl mx-auto mb-4 group-hover:scale-110 transition-transform shadow-sm">☁️</div>
+          <p class="text-gray-700 dark:text-gray-200 font-bold mb-1">Click or drag image here</p>
+          <p class="text-xs text-gray-500">JPG, PNG, WEBP</p>
+          <input type="file" id="compressInput" accept="image/*" class="hidden">
+        </div>
+        
+        <p id="compressFileName" class="text-sm text-blue-500 font-medium mb-6 hidden text-center truncate px-4 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg"></p>
+
+        <button onclick="handleToolAction(executeCompression, this)" class="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white py-4 rounded-xl font-bold shadow-lg shadow-blue-500/30 transform transition-all active:scale-95 flex justify-center items-center gap-2">
+          <span>Compress Image (-1 Credit)</span>
+        </button>
+
+        <!-- Result Area -->
+        <div id="compressResult" class="hidden mt-8 pt-8 border-t border-gray-100 dark:border-slate-700">
+            <p class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 text-center">Optimization Result</p>
+            <img id="compressPreview" class="max-h-64 mx-auto rounded-xl shadow-md mb-6 border border-gray-200 dark:border-slate-700">
+            <a id="compressDownload" class="w-full bg-green-500 hover:bg-green-400 text-white py-4 rounded-xl font-bold shadow-lg shadow-green-500/30 transform transition-all active:scale-95 flex justify-center items-center gap-2" target="_blank">
+              <span>⬇️ Download Optimized</span>
+            </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Convert View -->
+  <section id="convert" class="page-view">
+    <div class="flex flex-col items-center mt-12 px-4">
+      <div class="text-center mb-8">
+        <h1 class="text-4xl font-extrabold mb-3">Batch Converter</h1>
+        <p class="text-gray-500 dark:text-slate-400 max-w-md mx-auto">Transform formats and dimensions locally. No server limits.</p>
+      </div>
+
+      <div class="bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-xl w-full max-w-lg border border-gray-200 dark:border-slate-700 text-left">
+        
+        <div id="convertDropZone" class="file-drop-zone p-8 mb-6 rounded-2xl relative cursor-pointer text-center group" onclick="document.getElementById('convertInput').click()">
+          <div class="w-16 h-16 bg-gray-100 dark:bg-slate-700 rounded-full flex items-center justify-center text-2xl mx-auto mb-4 group-hover:scale-110 transition-transform shadow-sm">📂</div>
+          <p class="text-gray-700 dark:text-gray-200 font-bold mb-1">Click or drag files here</p>
+          <p class="text-xs text-gray-500">Select multiple files allowed</p>
+          <input type="file" id="convertInput" accept="image/*" multiple class="hidden">
+        </div>
+        
+        <p id="convertFileName" class="text-sm text-purple-500 font-medium mb-6 hidden text-center truncate px-4 py-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg"></p>
+
+        <div class="grid grid-cols-2 gap-4 mb-8">
+          <div>
+            <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Output Format</label>
+            <select id="convertFormat" class="w-full p-4 rounded-xl bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none appearance-none font-medium">
+              <option value="image/jpeg">JPG (.jpg)</option>
+              <option value="image/png">PNG (.png)</option>
+              <option value="image/webp">WEBP (.webp)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Max Width (px)</label>
+            <input type="number" id="resizeWidth" placeholder="Original" class="w-full p-4 rounded-xl bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 focus:ring-2 focus:ring-purple-500 outline-none font-medium">
+          </div>
+        </div>
+
+        <button onclick="handleToolAction(executeBatchConvert, this)" class="w-full bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white py-4 rounded-xl font-bold shadow-lg shadow-purple-500/30 transform transition-all active:scale-95 flex justify-center items-center gap-2">
+          <span>Process & Download ZIP (-1 Credit)</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- PDF View -->
+  <section id="pdf" class="page-view">
+    <div class="flex flex-col items-center mt-12 px-4">
+      <div class="text-center mb-8">
+        <h1 class="text-4xl font-extrabold mb-3">Image to PDF</h1>
+        <p class="text-gray-500 dark:text-slate-400 max-w-md mx-auto">Combine multiple images into a single formatted document.</p>
+      </div>
+
+      <div class="bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-xl w-full max-w-lg border border-gray-200 dark:border-slate-700 text-left">
+        
+        <div id="pdfDropZone" class="file-drop-zone p-8 mb-6 rounded-2xl relative cursor-pointer text-center group" onclick="document.getElementById('pdfInput').click()">
+          <div class="w-16 h-16 bg-gray-100 dark:bg-slate-700 rounded-full flex items-center justify-center text-2xl mx-auto mb-4 group-hover:scale-110 transition-transform shadow-sm">📑</div>
+          <p class="text-gray-700 dark:text-gray-200 font-bold mb-1">Click or drag files here</p>
+          <p class="text-xs text-gray-500">Order is determined by selection</p>
+          <input type="file" id="pdfInput" accept="image/*" multiple class="hidden">
+        </div>
+        
+        <p id="pdfFileName" class="text-sm text-red-500 font-medium mb-8 hidden text-center truncate px-4 py-2 bg-red-50 dark:bg-red-900/20 rounded-lg"></p>
+
+        <button onclick="handleToolAction(generatePDF, this)" class="w-full bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white py-4 rounded-xl font-bold shadow-lg shadow-red-500/30 transform transition-all active:scale-95 flex justify-center items-center gap-2">
+          <span>Generate Document (-1 Credit)</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- Ad / Recharge Modal (Glassmorphism) -->
+<div id="adModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm hidden items-center justify-center z-[100] px-4 transition-opacity duration-300 opacity-0">
+  <div class="bg-white dark:bg-slate-800 p-8 md:p-10 rounded-[2rem] shadow-2xl max-w-md w-full text-center border border-gray-200 dark:border-slate-700 transform scale-95 transition-transform duration-300" id="adModalContent">
+    <div class="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-4xl mx-auto mb-6">🎁</div>
+    <h2 class="text-3xl font-extrabold mb-3">Out of Credits!</h2>
+    <p class="text-gray-500 dark:text-slate-400 mb-8 leading-relaxed">QuickCompress relies on ads to stay free. Watch a short message from our sponsors to instantly unlock 5 Fast-Pass credits.</p>
+    
+    <!-- Simulated Ad Unit -->
+    <div class="bg-gray-50 dark:bg-slate-900 w-full h-48 rounded-2xl mb-8 flex flex-col items-center justify-center border-2 border-dashed border-gray-300 dark:border-slate-600 relative overflow-hidden">
+        <span class="text-gray-400 font-bold tracking-widest text-sm mb-2">ADVERTISEMENT</span>
+        <span id="adCountdown" class="text-blue-500 font-extrabold text-2xl">Waiting...</span>
+        <!-- Loading bar simulation -->
+        <div class="absolute bottom-0 left-0 h-1 bg-blue-500 transition-all duration-1000 w-0" id="adProgressBar"></div>
+    </div>
+
+    <button id="startAdBtn" onclick="simulateAdWatch()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-bold shadow-lg transform transition-all active:scale-95">Watch Ad to Unlock</button>
+    <button id="claimCreditsBtn" onclick="claimCredits()" class="hidden w-full bg-green-500 hover:bg-green-400 text-white py-4 rounded-xl font-bold shadow-lg shadow-green-500/30 transform transition-all active:scale-95 animate-pulse">Claim 5 Credits</button>
+    
+    <button onclick="closeModal()" id="closeModalBtn" class="mt-6 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 font-medium text-sm transition-colors">Maybe later</button>
+  </div>
+</div>
+
+<script>
+  // --- Advanced Toast Notification System ---
+  function showToast(message, type = 'success') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    
+    const colors = {
+      success: 'bg-green-500 text-white shadow-green-500/30',
+      error: 'bg-red-500 text-white shadow-red-500/30',
+      info: 'bg-blue-500 text-white shadow-blue-500/30',
+      warning: 'bg-yellow-500 text-white shadow-yellow-500/30'
+    };
+
+    toast.className = `toast px-6 py-3 rounded-xl font-bold shadow-lg text-sm pointer-events-auto ${colors[type]} transform translate-y-10 opacity-0 flex items-center gap-2`;
+    toast.innerHTML = `
+      <span>${type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️'}</span>
+      <span>${message}</span>
+    `;
+
+    container.appendChild(toast);
+    
+    // Animate In
+    setTimeout(() => { toast.classList.remove('translate-y-10', 'opacity-0'); }, 10);
+    
+    // Animate Out & Remove
+    setTimeout(() => {
+      toast.classList.add('translate-y-10', 'opacity-0');
+      setTimeout(() => toast.remove(), 300);
+    }, 4000);
+  }
+
+  // --- Core Configuration & State ---
+  const MAX_CREDITS = 5;
+  let currentCredits = parseInt(localStorage.getItem('qc_credits'));
+  if (isNaN(currentCredits)) currentCredits = MAX_CREDITS;
+
+  function updateCreditUI() {
+    document.getElementById('creditCounter').innerText = currentCredits;
+    localStorage.setItem('qc_credits', currentCredits);
+  }
+
+  function handleToolAction(toolFunction, btnElement) {
+    if (currentCredits <= 0) {
+      openModal();
+    } else {
+      // UX: Button loading state
+      const originalText = btnElement.innerHTML;
+      btnElement.innerHTML = `<span class="animate-spin text-xl">⏳</span> Processing...`;
+      btnElement.disabled = true;
+      btnElement.classList.add('opacity-80', 'cursor-not-allowed');
+
+      currentCredits -= 1;
+      updateCreditUI();
+      
+      // Execute function and reset button state
+      toolFunction().finally(() => {
+        btnElement.innerHTML = originalText;
+        btnElement.disabled = false;
+        btnElement.classList.remove('opacity-80', 'cursor-not-allowed');
+      });
+    }
+  }
+
+  // --- Modal Logic ---
+  function openModal() {
+    const modal = document.getElementById('adModal');
+    const content = document.getElementById('adModalContent');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    // Micro-delay for transition
+    setTimeout(() => {
+      modal.classList.remove('opacity-0');
+      content.classList.remove('scale-95');
+    }, 10);
+  }
+
+  function closeModal() {
+    const modal =
