@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<title>OptiStream | Pro File Architecture</title>
+<meta name="description" content="High-density browser-native file compression, batch conversion, watermarking, and document generation.">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0a0f1c">
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<script>
+  tailwind.config = { 
+    darkMode: 'class',
+    theme: {
+      extend: {
+        colors: { dark: { bg: '#0a0f1c', surface: '#111827', border: '#1f2937' } },
+        animation: { 'fade-in-up': 'fadeInUp 0.4s ease-out forwards' },
+        keyframes: {
+          fadeInUp: {
+            '0%': { opacity: '0', transform: 'translateY(15px)' },
+            '100%': { opacity: '1', transform: 'translateY(0)' }
+          }
+        }
+      }
+    }
+  }
+</script>
+
+<style>
+  body { font-family: system-ui, -apple-system, sans-serif; scroll-behavior: smooth; }
+  
+  /* UI Engineering */
+  .glass-nav { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(0,0,0,0.05); }
+  .dark .glass-nav { background: rgba(10, 15, 28, 0.85); border-bottom: 1px solid #1f2937; }
+
+  .nav-scroll-container { scrollbar-width: none; -ms-overflow-style: none; }
+  .nav-scroll-container::-webkit-scrollbar { display: none; }
+  
+  .nav-link { transition: all 0.2s; position: relative; padding: 0.5rem 0.25rem; cursor: pointer; font-weight: 600; white-space: nowrap; color: #6b7280; }
+  .dark .nav-link { color: #9ca3af; }
+  .nav-link:hover, .nav-link.active { color: #3b82f6; }
+  .nav-link.active::after { content: ''; position: absolute; bottom: -2px; left: 0; width: 100%; height: 2px; background: #3b82f6; border-radius: 2px; }
+
+  .page-view { display: none; opacity: 0; }
+  .page-view.active { display: flex; flex-direction: column; opacity: 1; animation: fadeInUp 0.4s ease-out forwards; }
+
+  /* Input & Drop Zones */
+  .file-drop-zone { border: 2px dashed #374151; transition: all 0.2s ease; background: rgba(0,0,0,0.01); }
+  .dark .file-drop-zone { background: #0f172a; border-color: #334155; }
+  .file-drop-zone.drag-active { border-color: #3b82f6; background: rgba(59, 130, 246, 0.05); transform: scale(1.02); }
+  
+  .input-field { width: 100%; padding: 0.75rem 1rem; border-radius: 0.5rem; outline: none; transition: all 0.2s; font-weight: 500; }
+  .light .input-field { background: #f9fafb; border: 1px solid #e5e7eb; color: #111827; }
+  .dark .input-field { background: #111827; border: 1px solid #374151; color: #f9fafb; }
+  .input-field:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  .dark ::-webkit-scrollbar-thumb { background: #334155; }
+</style>
+
+</head>
+
+<body class="bg-gray-50 text-gray-900 dark:bg-dark-bg dark:text-gray-100 min-h-screen flex flex-col transition-colors duration-300">
+
+<div id="toastContainer" class="fixed bottom-6 right-6 z-[999] flex flex-col gap-3 pointer-events-none items-end"></div>
+
+<header class="glass-nav sticky top-0 z-50 transition-colors duration-300">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+    <a href="#home" class="font-black text-2xl tracking-tighter text-blue-600 dark:text-blue-500 flex-shrink-0">OptiStream</a>
+    
+    <div class="flex items-center gap-3 md:gap-4 flex-shrink-0">
+      
+      <div class="bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-bold border border-blue-200 dark:border-blue-800/50 flex items-center gap-2">
+        <span>⚡</span> <span id="creditCounter">5</span> Credits
+      </div>
+
+      <button onclick="toggleTheme()" class="p-2 md:p-2.5 rounded-lg bg-gray-100 dark:bg-dark-surface hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors border border-gray-200 dark:border-dark-border">
+        <span id="themeIcon">☀️</span>
+      </button>
+
+      <button id="authBtn" class="hidden md:flex bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-200 dark:text-gray-900 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all items-center gap-2">
+        <span class="text-xs">👤</span> Sign In
+      </button>
+    </div>
+  </div>
+
+  <nav class="nav-scroll-container overflow-x-auto px-4 py-2 flex gap-6 md:justify-center text-sm border-t border-gray-200 dark:border-dark-border">
+    <a href="#home" class="nav-link active" data-target="home">Dashboard</a>
+    <a href="#compress" class="nav-link" data-target="compress">Compress</a>
+    <a href="#convert" class="nav-link" data-target="convert">Batch Convert</a>
+    <a href="#watermark" class="nav-link" data-target="watermark">Watermark</a>
+    <a href="#pdf" class="nav-link" data-target="pdf">PDF Matrix</a>
+  </nav>
+</header>
+
+<main class="flex-grow w-full pb-20 overflow-x-hidden">
+
+  <section id="home" class="page-view active items-center">
+    <div class="text-center mt-12 md:mt-24 px-4 max-w-5xl w-full">
+      <h1 class="text-5xl md:text-7xl font-black mb-6 leading-tight tracking-tighter">
+        Zero-Latency <br/>
+        <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-cyan-400">File Architecture.</span>
+      </h1>
+      <p class="text-gray-600 dark:text-gray-400 mb-8 text-lg max-w-2xl mx-auto font-medium">Enterprise-grade compression, format shifting, and watermarking running securely in your browser. Maximum data privacy.</p>
+      
+      <div class="flex justify-center gap-8 mb-12 border-y border-gray-200 dark:border-dark-border py-6 max-w-3xl mx-auto w-full">
+        <div class="text-center w-1/2">
+          <p class="text-3xl font-black text-blue-600 dark:text-blue-500" id="globalSaved">0.00 MB</p>
+          <p class="text-[10px] md:text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Bandwidth Saved</p>
+        </div>
+        <div class="w-px bg-gray-200 dark:bg-dark-border"></div>
+        <div class="text-center w-1/2">
+          <p class="text-3xl font-black text-gray-900 dark:text-white">100%</p>
+          <p class="text-[10px] md:text-xs text-gray-500 font-bold uppercase tracking-widest mt-1">Client-Side Engine</p>
+        </div>
+      </div>
+
+      <div class="w-full max-w-3xl mx-auto bg-gray-100 dark:bg-dark-surface h-24 mb-12 rounded-xl flex items-center justify-center border border-dashed border-gray-300 dark:border-gray-700">
+        <span class="text-gray-400 text-xs font-bold tracking-widest">[ AdSense Banner Placeholder ]</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
+        <a href="#compress" class="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-gray-200 dark:border-dark-border text-left hover:border-blue-500 transition-colors group">
+          <div class="text-3xl mb-4 group-hover:scale-110 transition-transform">🗜️</div>
+          <h3 class="font-bold text-lg mb-2">Cloud Compressor</h3>
+          <p class="text-gray-500 text-sm">Shrink assets up to 80% via Cloudinary AI.</p>
+        </a>
+        <a href="#convert" class="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-gray-200 dark:border-dark-border text-left hover:border-purple-500 transition-colors group">
+          <div class="text-3xl mb-4 group-hover:scale-110 transition-transform">🔄</div>
+          <h3 class="font-bold text-lg mb-2">Format Matrix</h3>
+          <p class="text-gray-500 text-sm">Batch convert MIME types and resize dimensions.</p>
+        </a>
+        <a href="#watermark" class="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-gray-200 dark:border-dark-border text-left hover:border-teal-500 transition-colors group">
+          <div class="text-3xl mb-4 group-hover:scale-110 transition-transform">©️</div>
+          <h3 class="font-bold text-lg mb-2">Watermark Engine</h3>
+          <p class="text-gray-500 text-sm">Stamp metadata arrays across images instantly.</p>
+        </a>
+        <a href="#pdf" class="bg-white dark:bg-dark-surface p-6 rounded-2xl border border-gray-200 dark:border-dark-border text-left hover:border-red-500 transition-colors group">
+          <div class="text-3xl mb-4 group-hover:scale-110 transition-transform">📑</div>
+          <h3 class="font-bold text-lg mb-2">Document Builder</h3>
+          <p class="text-gray-500 text-sm">Compile images into formatted A4 PDF binaries.</p>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section id="compress" class="page-view items-center mt-12 px-4">
+    <div class="w-full max-w-2xl text-left mb-6">
+      <h2 class="text-3xl font-black mb-2">Compression Engine</h2>
+      <p class="text-gray-500 text-sm font-medium">Target file size reduction via Cloud AI routing.</p>
+    </div>
+
+    <div class="bg-white dark:bg-dark-surface p-6 md:p-8 rounded-2xl w-full max-w-2xl border border-gray-200 dark:border-dark-border shadow-sm">
+      <div id="compressDropZone" class="file-drop-zone p-10 md:p-14 mb-6 rounded-xl relative cursor-pointer text-center" onclick="document.getElementById('compressInput').click()">
+        <div class="text-4xl mb-3">⬇️</div>
+        <p class="font-bold">Mount File</p>
+        <p class="text-xs text-gray-500 mt-1">JPG, PNG, WEBP (Max 1 Asset)</p>
+        <input type="file" id="compressInput" accept="image/*" class="hidden">
+      </div>
+      
+      <p id="compressFileName" class="text-sm text-blue-500 font-bold mb-6 hidden text-center truncate px-4 py-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg"></p>
+
+      <button id="compressBtn" onclick="handleProcessing(executeCompression, this)" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-lg font-bold transition-all disabled:opacity-50">
+        Execute Compression (-1 Credit)
+      </button>
+
+      <div id="compressResult" class="hidden mt-8 pt-8 border-t border-gray-100 dark:border-dark-border">
+          <div class="grid grid-cols-3 gap-3 md:gap-4 mb-6">
+            <div class="bg-gray-50 dark:bg-dark-bg p-3 md:p-4 rounded-lg border border-gray-200 dark:border-dark-border text-center">
+              <p class="text-[10px] text-gray-500 font-bold uppercase mb-1">Original</p>
+              <p class="text-base md:text-lg font-black" id="statOriginal">0 KB</p>
+            </div>
+            <div class="bg-blue-50 dark:bg-blue-900/10 p-3 md:p-4 rounded-lg border border-blue-200 dark:border-blue-800/50 text-center">
+              <p class="text-[10px] text-blue-500 font-bold uppercase mb-1">Saved</p>
+              <p class="text-lg md:text-xl font-black text-blue-600 dark:text-blue-400" id="statSaved">0%</p>
+            </div>
+            <div class="bg-green-50 dark:bg-green-900/10 p-3 md:p-4 rounded-lg border border-green-200 dark:border-green-800/50 text-center">
+              <p class="text-[10px] text-green-600 dark:text-green-500 font-bold uppercase mb-1">Output</p>
+              <p class="text-base md:text-lg font-black text-green-700 dark:text-green-400" id="statOutput">0 KB</p>
+            </div>
+          </div>
+          <img id="compressPreview" class="w-full h-auto max-h-64 object-contain mx-auto rounded-lg mb-6 border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-bg">
+          
+          <button id="compressDownloadBtn" class="w-full bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-200 dark:text-gray-900 text-white py-4 rounded-lg font-bold transition-colors flex justify-center items-center gap-2">
+            ⬇️ Download Optimized Asset
+          </button>
+      </div>
+    </div>
+  </section>
+
+  <section id="convert" class="page-view items-center mt-12 px-4">
+    <div class="w-full max-w-2xl text-left mb-6">
+      <h2 class="text-3xl font-black mb-2">Batch Conversion Matrix</h2>
+      <p class="text-gray-500 text-sm font-medium">Re-encode MIME types and inject width constraints locally.</p>
+    </div>
+
+    <div class="bg-white dark:bg-dark-surface p-6 md:p-8 rounded-2xl w-full max-w-2xl border border-gray-200 dark:border-dark-border shadow-sm">
+      <div id="convertDropZone" class="file-drop-zone p-10 md:p-14 mb-6 rounded-xl relative cursor-pointer text-center" onclick="document.getElementById('convertInput').click()">
+        <div class="text-4xl mb-3">📂</div>
+        <p class="font-bold">Mount Directory / Files</p>
+        <p class="text-xs text-gray-500 mt-1">Multi-select enabled</p>
+        <input type="file" id="convertInput" accept="image/*" multiple class="hidden">
+      </div>
+      
+      <p id="convertFileName" class="text-sm text-purple-500 font-bold mb-6 hidden text-center truncate px-4 py-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg"></p>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <div>
+          <label class="block text-xs font-bold text-gray-500 mb-2 uppercase">Target Extension</label>
+          <select id="convertFormat" class="input-field cursor-pointer">
+            <option value="image/jpeg">JPEG Baseline (.jpg)</option>
+            <option value="image/png">PNG-24 (.png)</option>
+            <option value="image/webp">WEBP (.webp)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-gray-500 mb-2 uppercase">Max Width (PX)</label>
+          <input type="number" id="resizeWidth" placeholder="Keep Original Dimensions" class="input-field">
+        </div>
+      </div>
+
+      <button onclick="handleProcessing(executeBatchConvert, this)" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-4 rounded-lg font-bold transition-all disabled:opacity-50">
+        Compile to ZIP (-1 Credit)
+      </button>
+    </div>
+  </section>
+
+  <section id="watermark" class="page-view items-center mt-12 px-4">
+    <div class="w-full max-w-2xl text-left mb-6">
+      <h2 class="text-3xl font-black mb-2">Watermark Engine</h2>
+      <p class="text-gray-500 text-sm font-medium">Stamp text overlays across image arrays locally.</p>
+    </div>
+
+    <div class="bg-white dark:bg-dark-surface p-6 md:p-8 rounded-2xl w-full max-w-2xl border border-gray-200 dark:border-dark-border shadow-sm">
+      <div id="watermarkDropZone" class="file-drop-zone p-10 md:p-14 mb-6 rounded-xl relative cursor-pointer text-center" onclick="document.getElementById('watermarkInput').click()">
+        <div class="text-4xl mb-3">©️</div>
+        <p class="font-bold">Mount Assets</p>
+        <p class="text-xs text-gray-500 mt-1">Multi-select enabled</p>
+        <input type="file" id="watermarkInput" accept="image/*" multiple class="hidden">
+      </div>
+      
+      <p id="watermarkFileName" class="text-sm text-teal-500 font-bold mb-6 hidden text-center truncate px-4 py-3 bg-teal-50 dark:bg-teal-900/20 rounded-lg"></p>
+
+      <div class="mb-8">
+          <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Watermark String</label>
+          <input type="text" id="watermarkText" placeholder="e.g. © OptiStream 2026" class="input-field">
+      </div>
+
+      <button onclick="handleProcessing(executeWatermark, this)" class="w-full bg-teal-600 hover:bg-teal-700 text-white py-4 rounded-lg font-bold transition-all disabled:opacity-50">
+        Apply & Export ZIP (-1 Credit)
+      </button>
+    </div>
+  </section>
+
+  <section id="pdf" class="page-view items-center mt-12 px-4">
+    <div class="w-full max-w-2xl text-left mb-6">
+      <h2 class="text-3xl font-black mb-2">Document Compiler</h2>
+      <p class="text-gray-500 text-sm font-medium">Merge visual assets into standardized A4 PDFs.</p>
+    </div>
+
+    <div class="bg-white dark:bg-dark-surface p-6 md:p-8 rounded-2xl w-full max-w-2xl border border-gray-200 dark:border-dark-border shadow-sm">
+      <div id="pdfDropZone" class="file-drop-zone p-10 md:p-14 mb-6 rounded-xl relative cursor-pointer text-center" onclick="document.getElementById('pdfInput').click()">
+        <div class="text-4xl mb-3">📑</div>
+        <p class="font-bold">Mount Image Sequence</p>
+        <p class="text-xs text-gray-500 mt-1">Selection order dictates page order</p>
+        <input type="file" id="pdfInput" accept="image/*" multiple class="hidden">
+      </div>
+      
+      <p id="pdfFileName" class="text-sm text-red-500 font-bold mb-8 hidden text-center truncate px-4 py-3 bg-red-50 dark:bg-red-900/20 rounded-lg"></p>
+
+      <button onclick="handleProcessing(generatePDF, this)" class="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-lg font-bold transition-all disabled:opacity-50">
+        Generate Binary PDF (-1 Credit)
+      </button>
+    </div>
+  </section>
+
+</main>
+
+<div id="adModal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md hidden items-center justify-center z-[100] px-4 transition-opacity duration-300 opacity-0">
+  <div class="bg-white dark:bg-dark-surface p-8 rounded-2xl shadow-2xl max-w-md w-full text-center border border-gray-200 dark:border-dark-border transform scale-95 transition-transform duration-300" id="adModalContent">
+    <div class="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 border border-blue-200 dark:border-blue-800">🎁</div>
+    <h2 class="text-2xl font-black mb-2">Engine Depleted</h2>
+    <p class="text-gray-500 dark:text-gray-400 mb-6 text-sm leading-relaxed">OptiStream relies on ads to maintain free local processing. Watch a brief sponsor payload to refresh your credits.</p>
+    
+    <div class="bg-gray-50 dark:bg-dark-bg w-full h-40 rounded-lg mb-6 flex flex-col items-center justify-center border border-dashed border-gray-300 dark:border-gray-700 relative overflow-hidden">
+        <span class="text-gray-400 font-bold tracking-widest text-xs mb-2">SPONSOR DATA</span>
+        <span id="adCountdown" class="text-blue-500 font-black text-3xl">Awaiting...</span>
+        <div class="absolute bottom-0 left-0 h-1 bg-blue-500 transition-all duration-1000 w-0" id="adProgressBar"></div>
+    </div>
+
+    <button id="startAdBtn" onclick="simulateAdWatch()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-lg font-bold transition-all">Execute Sponsor Ping</button>
+    <button id="claimCreditsBtn" onclick="claimCredits()" class="hidden w-full bg-green-600 hover:bg-green-700 text-white py-4 rounded-lg font-bold transition-all animate-pulse">Claim Protocol Credits</button>
+    <button onclick="closeModal()" id="closeModalBtn" class="mt-4 text-gray-400 hover:text-gray-500 text-sm font-bold uppercase tracking-wider block w-full py-2">Abort</button>
+  </div>
+</div>
+
+<script>
+  // --- UI Toast Engine ---
+  function showToast(message, type = 'success') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    const colors = type === 'success' ? 'bg-green-600 text-white border-green-700' : 'bg-red-600 text-white border-red-700';
+    toast.className = `px-6 py-4 rounded-xl font-bold shadow-2xl text-sm transition-all duration-300 transform translate-y-10 opacity-0 border ${colors} flex items-center gap-2`;
+    toast.innerHTML = `<span>${type === 'success' ? '✅' : '❌'}</span> <span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => toast.classList.remove('translate-y-10', 'opacity-0'), 10);
+    setTimeout(() => { toast.classList.add('translate-y-10', 'opacity-0'); setTimeout(() => toast.remove(), 300); }, 3500);
+  }
+
+  // --- Metrics Engine ---
+  let totalSavedMB = parseFloat(localStorage.getItem('os_saved_mb') || 0);
+  document.getElementById('globalSaved').innerText = totalSavedMB.toFixed(2) + ' MB';
+
+  function updateGlobalMetrics(originalBytes, optimizedBytes) {
+    if (originalBytes > optimizedBytes) {
+      const savedMB = (origina
