@@ -39,23 +39,33 @@ async function uploadImage() {
   formData.append("file", file);
   formData.append("upload_preset", "YOUR_UPLOAD_PRESET");
 
-  const res = await fetch("https://api.cloudinary.com/v1_1/YOUR_CLOUD_NAME/image/upload", {
-    method: "POST",
-    body: formData
-  });
+  try {
+    const res = await fetch("https://api.cloudinary.com/v1_1/YOUR_CLOUD_NAME/image/upload", {
+      method: "POST",
+      body: formData
+    });
 
-  const data = await res.json();
+    const data = await res.json();
 
-  const optimizedUrl = data.secure_url.replace("/upload/", "/upload/q_auto,f_auto/");
+    // Optimize image automatically
+    const optimizedUrl = data.secure_url.replace("/upload/", "/upload/q_auto,f_auto/");
 
-  document.getElementById("preview").src = optimizedUrl;
-  document.getElementById("preview").classList.remove("hidden");
+    // Show preview
+    const preview = document.getElementById("preview");
+    preview.src = optimizedUrl;
+    preview.classList.remove("hidden");
 
-  const download = document.getElementById("download");
-  download.href = optimizedUrl;
-  download.classList.remove("hidden");
+    // Download link
+    const download = document.getElementById("download");
+    download.href = optimizedUrl;
+    download.innerText = "Download Compressed Image";
+    download.classList.remove("hidden");
 
-  status.innerText = "Done!";
+    status.innerText = "Compression complete ✅";
+  } catch (err) {
+    status.innerText = "Error compressing image ❌";
+    console.error(err);
+  }
 }
 </script>
 
