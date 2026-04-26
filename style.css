@@ -1,0 +1,12 @@
+body { font-family: system-ui, -apple-system, sans-serif; scroll-behavior: smooth; }
+.glass-nav { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(0,0,0,0.05); }
+.dark .glass-nav { background: rgba(10, 15, 28, 0.85); border-bottom: 1px solid #1f2937; }
+.nav-scroll { scrollbar-width: none; } .nav-scroll::-webkit-scrollbar { display: none; }
+.nav-link { transition: 0.2s; padding: 0.5rem 0.5rem; font-weight: 600; color: #6b7280; white-space: nowrap; }
+.dark .nav-link { color: #9ca3af; }
+.nav-link:hover, .nav-link.active { color: #3b82f6; }
+.file-drop-zone { border: 2px dashed #374151; transition: 0.2s; background: rgba(0,0,0,0.01); border-radius: 1rem; padding: 3rem; text-align: center; cursor: pointer; }
+.dark .file-drop-zone { background: #0f172a; border-color: #334155; }
+.file-drop-zone:hover { border-color: #3b82f6; background: rgba(59, 130, 246, 0.05); }
+::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; } .dark ::-webkit-scrollbar-thumb { background: #334155; }

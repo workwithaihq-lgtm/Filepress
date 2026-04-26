@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OptiStream | Architecture</title>
+<link rel="stylesheet" href="/style.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config = { darkMode: 'class' }</script>
+</head>
+<body class="bg-gray-50 text-gray-900 dark:bg-[#0a0f1c] dark:text-gray-100 min-h-screen flex flex-col">
+
+<header class="glass-nav sticky top-0 z-50">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+    <a href="/" class="font-black text-2xl text-blue-600 dark:text-blue-500">OptiStream</a>
+    <div class="flex items-center gap-3">
+      <div class="bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 px-3 py-1.5 rounded-lg text-sm font-bold border border-blue-200 dark:border-blue-800/50">
+        ⚡ <span id="creditCounter">5</span> Credits
+      </div>
+      <button onclick="toggleTheme()" class="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">☀️</button>
+    </div>
+  </div>
+</header>
+
+<main class="flex-grow w-full max-w-6xl mx-auto px-4 mt-20 text-center">
+  <h1 class="text-5xl md:text-7xl font-black mb-6">Zero-Latency <br><span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-cyan-400">Architecture.</span></h1>
+  <p class="text-gray-500 mb-12 text-lg font-medium">Enterprise compression. No server payload retention.</p>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <a href="/tools/compress-image.html" class="bg-white dark:bg-[#111827] p-8 rounded-2xl border border-gray-200 dark:border-gray-800 hover:border-blue-500 transition-colors text-left group block">
+      <div class="text-4xl mb-4 group-hover:scale-110 transition-transform">🗜️</div>
+      <h3 class="font-bold text-xl mb-2">Image Matrix</h3>
+      <p class="text-gray-500 text-sm">JPG/PNG compression via Cloud AI.</p>
+    </a>
+    <a href="/tools/compress-video.html" class="bg-white dark:bg-[#111827] p-8 rounded-2xl border border-gray-200 dark:border-gray-800 hover:border-red-500 transition-colors text-left group block">
+      <div class="text-4xl mb-4 group-hover:scale-110 transition-transform">🎞️</div>
+      <h3 class="font-bold text-xl mb-2">Video Engine <span class="text-xs bg-red-900/50 text-red-400 px-2 py-1 rounded ml-2">2 Credits</span></h3>
+      <p class="text-gray-500 text-sm">Transcode MP4/WEBM payloads locally.</p>
+    </a>
+    <div class="bg-white dark:bg-[#111827] p-8 rounded-2xl border border-gray-200 dark:border-gray-800 opacity-50 text-left">
+      <div class="text-4xl mb-4">📑</div>
+      <h3 class="font-bold text-xl mb-2">PDF Compiler</h3>
+      <p class="text-gray-500 text-sm">Coming Next Phase.</p>
+    </div>
+  </div>
+</main>
+
+<script src="/core.js"></script>
+</body>
+</html>
