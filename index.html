@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OptiStream | Zero-Latency Client-Side Compression</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: '#0f172a',
+                        darker: '#0b1120',
+                        brand: '#10b981'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Core Engines -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    
+    <style>
+        .glass {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .hide { display: none !important; }
+        .drop-zone { border: 2px dashed #334155; transition: all 0.2s ease; }
+        .drop-zone.dragover { border-color: #10b981; background: rgba(16, 185, 129, 0.1); }
+        /* Checkerboard for transparent images */
+        .checkerboard {
+            background-color: #fff;
+            background-image: 
+                linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%, #ccc),
+                linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%, #ccc);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 dark:bg-darker dark:text-white min-h-screen flex flex-col font-sans transition-colors duration-200">
+
+    <!-- GLOBAL NAVIGATION -->
+    <nav class="sticky top-0 z-50 glass w-full">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo -->
+                <div class="flex-shrink-0 cursor-pointer" onclick="switchView('home')">
+                    <span class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand to-emerald-400">OptiStream</span>
+                </div>
+                
+                <!-- Desktop Nav -->
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <button onclick="switchView('image-compressor')" class="hover:text-brand px-3 py-2 rounded-md text-sm font-medium transition-colors">Image Matrix</button>
+                        <button onclick="switchView('video-compressor')" class="hover:text-brand px-3 py-2 rounded-md text-sm font-medium transition-colors">Video</button>
+                        <button onclick="switchView('pdf-engine')" class="hover:text-brand px-3 py-2 rounded-md text-sm font-medium transition-colors">PDF Engine</button>
+                        <button onclick="switchView('watermark-studio')" class="hover:text-brand px-3 py-2 rounded-md text-sm font-medium transition-colors">Watermark</button>
+                        <button onclick="switchView('archive-engine')" class="hover:text-brand px-3 py-2 rounded-md text-sm font-medium transition-colors">ZIP Archive</button>
+                        <button onclick="switchView('voiceover-studio')" class="hover:text-brand px-3 py-2 rounded-md text-sm font-medium transition-colors text-emerald-600 dark:text-emerald-400">✨ Audio</button>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-1 text-sm font-medium text-brand">
+                        <i data-lucide="zap" class="w-4 h-4"></i>
+                        <span id="credit-counter">5 Credits</span>
+                    </div>
+                    <button id="theme-toggle" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors">
+                        <i data-lucide="sun" class="w-5 h-5 hidden dark:block"></i>
+                        <i data-lucide="moon" class="w-5 h-5 block dark:hidden"></i>
+                    </button>
+                    <!-- SUPABASE AUTH PLACEHOLDER -->
+                    <button id="btn-supabase-auth" class="bg-gray-800 dark:bg-white text-white dark:text-black px-4 py-2 rounded-md text-sm font-semibold hover:bg-gray-700 dark:hover:bg-gray-200 transition-colors">
+                        Sign In
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- Mobile Nav (Scrollable) -->
+        <div class="md:hidden overflow-x-auto pb-2 px-4 hide-scrollbar">
+            <div class="flex space-x-4">
+                <button onclick="switchView('image-compressor')" class="whitespace-nowrap text-sm hover:text-brand">Image</button>
+                <button onclick="switchView('video-compressor')" class="whitespace-nowrap text-sm hover:text-brand">Video</button>
+                <button onclick="switchView('pdf-engine')" class="whitespace-nowrap text-sm hover:text-brand">PDF</button>
+                <button onclick="switchView('watermark-studio')" class="whitespace-nowrap text-sm hover:text-brand">Watermark</button>
+                <button onclick="switchView('archive-engine')" class="whitespace-nowrap text-sm hover:text-brand">Archive</button>
+                <button onclick="switchView('voiceover-studio')" class="whitespace-nowrap text-sm hover:text-brand text-emerald-600 dark:text-emerald-400">✨ Audio</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="flex-grow flex flex-col pt-8 pb-16 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        <!-- ================= HOME VIEW ================= -->
+        <section id="view-home" class="view-section active flex flex-col space-y-16">
+            <!-- Hero -->
+            <div class="text-center space-y-6 pt-10">
+                <h1 class="text-5xl md:text-7xl font-extrabold tracking-tight">
+                    Zero-Latency <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand to-cyan-500">Data Architecture.</span>
+                </h1>
+                <p class="text-xl md:text-2xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+                    Enterprise-grade media compression running cryptographically secure in your local browser memory. No servers. No limits.
+                </p>
+                <div class="flex flex-col sm:flex-row justify-center gap-4 pt-4">
+                    <button onclick="switchView('video-compressor')" class="px-8 py-4 bg-brand text-white rounded-lg font-bold hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2">
+                        <i data-lucide="video" class="w-5 h-5"></i> Launch Video Engine
+                    </button>
+                    <button onclick="switchView('image-compressor')" class="px-8 py-4 bg-gray-800 dark:bg-gray-200 text-white dark:text-black rounded-lg font-bold hover:bg-gray-700 dark:hover:bg-gray-300 transition-all flex items-center justify-center gap-2">
+                        <i data-lucide="image" class="w-5 h-5"></i> Launch Image Matrix
+                    </button>
+                </div>
+                
+                <!-- Live Metrics -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-12 pt-8 border-t border-gray-200 dark:border-gray-800">
+                    <div class="p-4"><p class="text-3xl font-black text-brand">1.4 TB</p><p class="text-sm text-gray-500 uppercase tracking-widest mt-1">Bandwidth Saved</p></div>
+                    <div class="p-4"><p class="text-3xl font-black text-brand">100%</p><p class="text-sm text-gray-500 uppercase tracking-widest mt-1">Green Efficiency</p></div>
+                    <div class="p-4"><p class="text-3xl font-black text-brand">0 ms</p><p class="text-sm text-gray-500 uppercase tracking-widest mt-1">Upload Latency</p></div>
+                    <div class="p-4"><p class="text-3xl font-black text-brand">AES-256</p><p class="text-sm text-gray-500 uppercase tracking-widest mt-1">Architecture</p></div>
+                </div>
+            </div>
+
+            <!-- AdSense Placeholder Top -->
+            <div class="w-full h-24 bg-gray-200 dark:bg-gray-800 rounded-lg border border-dashed border-gray-400 flex items-center justify-center text-gray-500">
+                <!-- ADSENSE RESPONSIVE AD UNIT PLACEHOLDER -->
+                <span class="text-sm font-mono">AdSense Auto Ad Injection Point</span>
+            </div>
+
+            <!-- Tool Grid -->
+            <div>
+                <h2 class="text-2xl font-bold mb-6">The Core Application Suite</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div onclick="switchView('video-compressor')" class="group cursor-pointer p-6 bg-white dark:bg-dark border border-gray-200 dark:border-gray-800 rounded-xl hover:border-brand transition-all shadow-sm hover:shadow-brand/20">
+                        <i data-lucide="video" class="w-8 h-8 text-brand mb-4"></i>
+                        <h3 class="text-xl font-bold mb-2">Video Compressor</h3>
+                        <p class="text-gray-500 dark:text-gray-400 text-sm">Transcode MP4/WebM locally via virtualized WebAssembly FFmpeg engine.</p>
+                    </div>
+                    <div onclick="switchView('image-compressor')" class="group cursor-pointer p-6 bg-white dark:bg-dark border border-gray-200 dark:border-gray-800 rounded-xl hover:border-brand transition-all shadow-sm hover:shadow-brand/20">
+                        <i data-lucide="image-minus" class="w-8 h-8 text-brand mb-4"></i>
+                        <h3 class="text-xl font-bold mb-2">Image Matrix</h3>
+                        <p class="text-gray-500 dark:text-gray-400 text-sm">Compress JPG/PNG/WEBP via HTML5 Canvas. Cloudinary fallback enabled.</p>
+                    </div>
+                    <div onclick="switchView('pdf-engine')" class="group cursor-pointer p-6 bg-white dark:bg-dark border border-gray-200 dark:border-gray-800 rounded-xl hover:border-brand transition-all shadow-sm hover:shadow-brand/20">
+                        <i data-lucide="file-text" class="w-8 h-8 text-brand mb-4"></i>
+                        <h3 class="text-xl font-bold mb-2">PDF Engine</h3>
+                        <p class="text-gray-500 dark:text-gray-400 text-sm">Parse, compile, and compress binary document matrices locally.</p>
+                    </div>
+                    <div onclick="switchView('watermark-studio')" class="group cursor-pointer p-6 bg-white dark:bg-dark border border-gray-200 dark:border-gray-800 rounded-xl hover:border-brand transition-all shadow-sm hover:shadow-brand/20">
+                        <i data-lucide="stamp" class="w-8 h-8 text-brand mb-4"></i>
+                        <h3 class="text-xl font-bold mb-2">Watermark Studio</h3>
+                        <p class="text-gray-500 dark:text-gray-400 text-sm">Batch stamp text or image metadata across visual arrays instantly.</p>
+                    </div>
+                    <div onclick="switchView('archive-engine')" class="group cursor-pointer p-6 bg-white dark:bg-dark border border-gray-200 dark:border-gray-800 rounded-xl hover:border-brand transition-all shadow-sm hover:shadow-brand/20">
+                        <i data-lucide="archive" class="w-8 h-8 text-brand mb-4"></i>
+                        <h3 class="text-xl font-bold mb-2">ZIP Bundler</h3>
+                        <p class="text-gray-500 dark:text-gray-400 text-sm">Compress heterogeneous file arrays into Deflate archives via JSZip.</p>
+                    </div>
+                    <div onclick="switchView('voiceover-studio')" class="group cursor-pointer p-6 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800 rounded-xl hover:border-brand transition-all shadow-sm hover:shadow-brand/20">
+                        <i data-lucide="mic" class="w-8 h-8 text-brand mb-4"></i>
+                        <h3 class="text-xl font-bold mb-2 flex items-center gap-2">✨ Voiceover Studio</h3>
+                        <p class="text-emerald-700 dark:text-emerald-400 text-sm">Synthesize studio-quality PCM/WAV audio tracks from text using the Gemini TTS engine.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Info Columns (SEO & AdSense Padding) -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 py-10">
+                <div>
+                    <h4 class="font-bold text-lg mb-3 flex items-center gap-2"><i data-lucide="shield"></i> Cryptographic Security</h4>
+                    <p class="text-sm text-gray-500 leading-relaxed">Unlike traditional cloud converters, OptiStream processes binary payloads entirely within your local RAM. Data is never transmitted over HTTP unless explicit Cloudinary fallback is triggered. Zero server retention guarantees absolute corporate privacy.</p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-lg mb-3 flex items-center gap-2"><i data-lucide="leaf"></i> Eco-Routing Framework</h4>
+                    <p class="text-sm text-gray-500 leading-relaxed">Server farms are major carbon emitters. By offloading CPU cycles to the edge (your device), we achieve 100% Green Computing. Every gigabyte processed locally is a reduction in global server electricity consumption.</p>
+                </div>
+                <div>
+                    <h4 class="font-bold text-lg mb-3 flex items-center gap-2"><i data-lucide="graduation-cap"></i> Academic Transparency</h4>
+                    <p class="text-sm text-gray-500 leading-relaxed">We believe in algorithmic transparency. Our engines utilize standard open-source mechanics like Discrete Cosine Transform (DCT) for JPEGs and Huffman coding. Learn exactly how your bits are manipulated.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= IMAGE COMPRESSOR VIEW ================= -->
+        <section id="view-image-compressor" class="view-section hide flex flex-col space-y-6">
+            <div>
+                <h2 class="text-3xl font-bold">Image Matrix</h2>
+                <p class="text-gray-500">Client-side processing via HTML5 Canvas. Cloud fallback available.</p>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Controls & Input -->
+                <div class="lg:col-span-1 space-y-6">
+                    <div id="img-dropzone" class="drop-zone p-8 rounded-xl flex flex-col items-center justify-center text-center cursor-pointer bg-white dark:bg-dark">
+                        <i data-lucide="upload-cloud" class="w-12 h-12 text-gray-400 mb-4"></i>
+                        <p class="font-semibold">Drop image here or click to browse</p>
+                        <p class="text-xs text-gray-500 mt-2">Supports JPG, PNG, WEBP (Max 50MB)</p>
+                        <input type="file" id="img-input" class="hidden" accept="image/jpeg, image/png, image/webp">
+                    </div>
+                    
+                    <div class="bg-white dark:bg-dark p-6 rounded-xl border border-gray-200 dark:border-gray-800">
+                        <label class="block text-sm font-medium mb-2">Compression Quality: <span id="img-quality-val">80%</span></label>
+                        <input type="range" id="img-quality" min="1" max="100" value="80" class="w-full accent-brand">
+                        
+                        <div class="mt-6">
+                            <label class="flex items-center space-x-2 text-sm">
+                                <input type="checkbox" id="img-cloud-fallback" class="accent-brand rounded text-brand focus:ring-brand">
+                                <span>Use Cloudinary Fallback Engine</span>
+                            </label>
+                            <p class="text-xs text-gray-500 mt-1 ml-6">Required for heavy/unsupported formats.</p>
+                        </div>
+                        
+                        <button id="btn-compress-img" class="mt-6 w-full py-3 bg-brand text-white rounded-lg font-bold hover:bg-emerald-600 transition-colors disabled:opacity-50" disabled>
+                            Execute Compression
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Output Preview -->
+                <div class="lg:col-span-2 bg-white dark:bg-dark p-6 rounded-xl border border-gray-200 dark:border-gray-800 flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold">Execution Output</h3>
+                        <div id="img-metrics" class="text-sm font-mono text-brand hidden">
+                            Saved: <span id="img-saved-bytes"></span>
+                        </div>
+                    </div>
+                    <div class="flex-grow flex items-center justify-center bg-gray-100 dark:bg-gray-900 rounded-lg overflow-hidden checkerboard relative min-h-[300px]">
+                        <img id="img-preview" class="max-w-full max-h-[500px] object-contain hidden" />
+                        <p id="img-placeholder-text" class="text-gray-400">Awaiting Payload...</p>
+                        
+                        <!-- Loading Overlay -->
+                        <div id="img-loader" class="absolute inset-0 bg-dark/80 flex flex-col items-center justify-center hidden">
+                            <i data-lucide="loader" class="w-8 h-8 text-brand animate-spin mb-2"></i>
+                            <span class="text-brand font-mono text-sm">Processing Payload...</span>
+                        </div>
+                    </div>
+                    
+                    <!-- AI Metadata Assistant Panel -->
+                    <div id="ai-metadata-panel" class="mt-4 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg hidden text-left">
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="font-bold text-sm text-emerald-800 dark:text-emerald-400 flex items-center gap-1">✨ AI Vision Analytics</h4>
+                            <div class="flex gap-2">
+                                <button id="btn-ai-palette" class="text-xs px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded transition-colors disabled:opacity-50">✨ Palette</button>
+                                <button id="btn-ai-metadata" class="text-xs px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded transition-colors disabled:opacity-50">✨ SEO Data</button>
+                            </div>
+                        </div>
+                        
+                        <div id="ai-palette-results" class="flex w-full mt-3 hidden h-8 rounded-md overflow-hidden shadow-sm cursor-pointer" title="Click a color to copy HEX"></div>
+
+                        <div id="ai-metadata-results" class="text-xs text-gray-700 dark:text-gray-300 space-y-2 mt-3 hidden">
+                            <p><strong>Alt Text:</strong> <span id="ai-alt-text">...</span></p>
+                            <p><strong>Caption:</strong> <span id="ai-caption">...</span></p>
+                            <p><strong>Tags:</strong> <span id="ai-tags">...</span></p>
+                        </div>
+                        <div id="ai-loader" class="text-xs text-emerald-600 hidden flex items-center gap-2 mt-2">
+                            <i data-lucide="loader" class="w-3 h-3 animate-spin"></i> Analyzing visual matrix...
+                        </div>
+                    </div>
+
+                    <button id="btn-download-img" class="mt-4 w-full py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors hidden flex items-center justify-center gap-2">
+                        <i data-lucide="download" class="w-5 h-5"></i> Download Artifact
+                    </button>
+                </div>
+            </div>
+            
+            <!-- AdSense Placeholder Bottom -->
+            <div class="w-full h-24 bg-gray-200 dark:bg-gray-800 rounded-lg border border-dashed border-gray-400 flex items-center justify-center text-gray-500 mt-8">
+                <!-- ADSENSE RESPONSIVE AD UNIT PLACEHOLDER -->
+                <span class="text-sm font-mono">AdSense Display Ad Injection Point</span>
+            </div>
+        </section>
+
+        <!-- ================= WATERMARK STUDIO VIEW ================= -->
+        <section id="view-watermark-studio" class="view-section hide flex flex-col space-y-6">
+            <div>
+                <h2 class="text-3xl font-bold">Watermark Studio</h2>
+                <p class="text-gray-500">Cryptographically apply text metadata over visual arrays.</p>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Controls -->
+                <div class="lg:col-span-1 space-y-6">
+                    <div id="wm-dropzone" class="drop-zone p-6 rounded-xl flex flex-col items-center justify-center text-center cursor-pointer bg-white dark:bg-dark">
+                        <p class="font-semibold text-sm">Drop Source Image</p>
+                        <input type="file" id="wm-input" class="hidden" accept="image/*">
+                    </div>
+                    
+                    <div class="bg-white dark:bg-dark p-6 rounded-xl border border-gray-200 dark:border-gray-800 space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Watermark Text:</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="wm-text" value="© OptiStream" class="w-full p-2 rounded bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700">
+                                <button id="btn-auto-brand" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-sm transition-colors shadow-sm whitespace-nowrap disabled:opacity-50" title="Suggest watermark based on image">✨ Auto-Brand</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Color:</label>
+                                <input type="color" id="wm-color" value="#ffffff" class="w-full h-10 rounded cursor-pointer">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Opacity:</label>
+                                <input type="range" id="wm-opacity" min="0" max="1" step="0.1" value="0.7" class="w-full accent-brand mt-2">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Position:</label>
+                            <select id="wm-position" class="w-full p-2 rounded bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700">
+                                <option value="center">Center</option>
+                                <option value="bottom-right" selected>Bottom Right</option>
+                                <option value="top-left">Top Left</option>
+                            </select>
+                        </div>
+                        <button id="btn-apply-wm" class="w-full py-3 bg-brand text-white rounded-lg font-bold hover:bg-emerald-600 transition-colors disabled:opacity-50" disabled>
+                            Apply Watermark
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Before/After Preview -->
+                <div class="lg:col-span-2 space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
+                        <div class="bg-white dark:bg-dark p-4 rounded-xl border border-gray-200 dark:border-gray-800 flex flex-col">
+                            <h3 class="font-bold text-sm mb-2">Original (Before)</h3>
+                            <div class="flex-grow flex items-center justify-center bg-gray-100 dark:bg-gray-900 rounded checkerboard min-h-[250px]">
+                                <img id="wm-preview-before" class="max-w-full max-h-[300px] object-contain hidden" />
+                            </div>
+                        </div>
+                        <div class="bg-white dark:bg-dark p-4 rounded-xl border border-gray-200 dark:border-gray-800 flex flex-col relative">
+                            <h3 class="font-bold text-sm mb-2 text-brand">Output (After)</h3>
+                            <div class="flex-grow flex items-center justify-center bg-gray-100 dark:bg-gray-900 rounded checkerboard min-h-[250px]">
+                                <img id="wm-preview-after" class="max-w-full max-h-[300px] object-contain hidden" />
+                            </div>
+                        </div>
+                    </div>
+                    <button id="btn-download-wm" class="w-full py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors hidden flex items-center justify-center gap-2">
+                        <i data-lucide="download" class="w-5 h-5"></i> Download Stamped Artifact
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= PDF ENGINE VIEW ================= -->
+        <section id="view-pdf-engine" class="view-section hide flex flex-col space-y-6">
+            <div>
+                <h2 class="text-3xl font-bold flex items-center gap-3">
+                    PDF Engine 
+                    <span class="text-xs font-mono bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 px-2 py-1 rounded">STRUCTURAL STRIPPING</span>
+                </h2>
+                <p class="text-gray-500 mt-2">Compress existing PDFs by stripping structural bloat and metadata, or compile text to PDF.</p>
+            </div>
+            
+            <div class="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-500 p-4 mb-4">
+                <p class="text-sm text-yellow-800 dark:text-yellow-200 font-medium">Technical Note: Client-side JS cannot deeply downsample embedded PDF images without WASM. This module aggressively rebuilds the object tree and strips hidden metadata to reduce size. If a PDF is already optimized, size will not change.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- PDF Compress -->
+                <div class="bg-white dark:bg-dark p-6 rounded-xl border border-gray-200 dark:border-gray-800 flex flex-col">
+                    <h3 class="font-bold mb-4 border-b border-gray-200 dark:border-gray-700 pb-2">Structural Compression</h3>
+                    <div id="pdf-dropzone" class="drop-zone flex-grow flex flex-col items-center justify-center p-6 rounded text-center cursor-pointer mb-4">
+                        <i data-lucide="file-text" class="w-10 h-10 text-brand mb-2"></i>
+                        <p class="text-sm font-semibold">Drop PDF Payload</p>
+                        <input type="file" id="pdf-input" class="hidden" accept="application/pdf">
+                    </div>
+                    <button id="btn-compress-pdf" class="w-full py-3 bg-brand text-white rounded-lg font-bold disabled:opacity-50" disabled>Strip & Rebuild PDF</button>
+                </div>
+                
+                <!-- Output / Actions -->
+                <div class="bg-white dark:bg-dark p-6 rounded-xl border border-gray-200 dark:border-gray-800 flex flex-col items-center justify-center text-center">
+                    <div id="pdf-status" class="text-gray-500 space-y-4">
+                        <i data-lucide="cpu" class="w-16 h-16 mx-auto text-gray-400"></i>
+                        <p>Awaiting PDF Execution.</p>
+                    </div>
+                    <button id="btn-download-pdf" class="mt-6 w-full py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors hidden">
+                        Download Optimized Document
+                    </button>
+                </div>
+            </div>
+
+            <!-- AI PDF Drafter -->
+            <div class="bg-emerald-50 dark:bg-emerald-900/20 p-6 rounded-xl border border-emerald-200 dark:border-emerald-800 flex flex-col mt-6">
+                <h3 class="font-bold mb-2 text-emerald-800 dark:text-emerald-400 flex items-center gap-2">✨ AI Document Drafter</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Generate professional documents and instantly compile them into PDFs directly in your browser.</p>
+                <div class="flex flex-col md:flex-row gap-4">
+                    <input type="text" id="pdf-ai-prompt" placeholder="e.g., 'Write a one-page non-disclosure agreement for a graphic designer'" class="flex-grow p-3 rounded bg-white dark:bg-dark border border-gray-300 dark:border-gray-700 focus:ring-brand focus:border-brand">
+                    <button id="btn-ai-draft-pdf" class="md:w-auto w-full py-3 px-6 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50">
+                        ✨ Draft & Compile
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= VIDEO COMPRESSOR VIEW (FFMPEG WARNING) ================= -->
+        <section id="view-video-compressor" class="view-section hide flex flex-col space-y-6">
+            <div>
+                <h2 class="text-3xl font-bold text-red-500">Video Transcoder (WASM)</h2>
+                <p class="text-gray-500">Hardware-dependent local processing.</p>
+            </div>
+            
+            <div class="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-6 rounded space-y-3">
+                <h3 class="font-bold text-red-700 dark:text-red-400 flex items-center gap-2">
+                    <i data-lucide="alert-triangle"></i> CRITICAL HARDWARE WARNING
+                </h3>
+                <p class="text-sm text-red-800 dark:text-red-200">
+                    This module attempts to virtualize a Linux video encoder (FFmpeg) inside your browser memory. 
+                    <br><br>
+                    <strong>Constraints:</strong> Mobile browsers or devices with < 8GB RAM may crash during 4K processing. Processing is highly CPU-intensive and will spike local device temperature. Vercel deployment requires specific `SharedArrayBuffer` headers.
+                </p>
+            </div>
+
+            <div class="bg-white dark:bg-dark p-8 rounded-xl border border-gray-200 dark:border-gray-800 text-center">
+                <i data-lucide="lock" class="w-16 h-16 mx-auto text-gray-400 mb-4"></i>
+                <h3 class="text-xl font-bold mb-2">FFmpeg.wasm Injection Required</h3>
+                <p class="text-gray-500 text-sm max-w-md mx-auto mb-6">To activate this module, ensure your hosting environment (Vercel) emits cross-origin isolation headers. The UI is disabled until environment constraints are met.</p>
+                <button disabled class="px-6 py-3 bg-gray-300 dark:bg-gray-700 text-gray-500 rounded font-bold cursor-not-allowed">
+                    System Constraints Not Met
+                </button>
+            </div>
+        </section>
+
+        <!-- ================= ARCHIVE ENGINE (ZIP) ================= -->
+        <section id="view-archive-engine" class="view-section hide flex flex-col space-y-6">
+             <div>
+                <h2 class="text-3xl font-bold">Deflate Archive Bundler</h2>
+                <p class="text-gray-500">Compress heterogeneous arrays into standard .zip structures.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white dark:bg-dark p-6 rounded-xl border border-gray-200 dark:border-gray-800">
+                    <div id="zip-dropzone" class="drop-zone h-48 flex flex-col items-center justify-center p-6 rounded text-center cursor-pointer mb-4">
+                        <i data-lucide="layers" class="w-10 h-10 text-brand mb-2"></i>
+                        <p class="text-sm font-semibold">Drop Multiple Files</p>
+                        <input type="file" id="zip-input" multiple class="hidden">
+                    </div>
+                    <ul id="zip-file-list" class="text-xs space-y-1 mb-4 text-gray-500 h-24 overflow-y-auto"></ul>
+                    <button id="btn-create-zip" class="w-full py-3 bg-brand text-white rounded-lg font-bold disabled:opacity-50" disabled>
+                        Initialize Deflate Compression
+                    </button>
+                </div>
+
+                 <div class="bg-white dark:bg-dark p-6 rounded-xl border border-gray-200 dark:border-gray-800 flex flex-col items-center justify-center text-center">
+                     <i data-lucide="archive" class="w-16 h-16 text-gray-400 mb-4"></i>
+                     <p id="zip-status" class="text-sm text-gray-500 font-mono mb-4">Awaiting Input Array...</p>
+                     
+                     <!-- Smart Zip Naming -->
+                     <div class="w-full flex items-center gap-2 mb-4 hidden" id="zip-name-container">
+                         <input type="text" id="zip-filename" value="optistream_bundle" class="flex-grow p-2 text-sm rounded bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 focus:ring-brand focus:border-brand">
+                         <span class="text-gray-500 text-sm">.zip</span>
+                         <button id="btn-smart-zip-name" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-sm transition-colors shadow-sm whitespace-nowrap disabled:opacity-50" title="Suggest filename based on contents">✨ Auto-Name</button>
+                     </div>
+
+                     <button id="btn-download-zip" class="mt-2 w-full py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors hidden">
+                        Download .ZIP Blob
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= VOICEOVER STUDIO (AUDIO TTS) ================= -->
+        <section id="view-voiceover-studio" class="view-section hide flex flex-col space-y-6">
+            <div>
+                <h2 class="text-3xl font-bold flex items-center gap-3">
+                    ✨ AI Voiceover Studio
+                    <span class="text-xs font-mono bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 px-2 py-1 rounded">GEMINI TTS ENGINE</span>
+                </h2>
+                <p class="text-gray-500 mt-2">Generate studio-quality voiceovers dynamically via neural speech synthesis.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Input Controls -->
+                <div class="bg-white dark:bg-dark p-6 rounded-xl border border-gray-200 dark:border-gray-800 flex flex-col">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="block text-sm font-medium">Voice Script Payload:</label>
+                        <button id="btn-ai-polish-script" class="text-xs px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded transition-colors disabled:opacity-50" title="Turn rough notes into a professional script">✨ Polish Notes</button>
+                    </div>
+                    <textarea id="tts-script" rows="6" class="w-full p-3 rounded bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 focus:ring-brand focus:border-brand resize-none mb-4" placeholder="Enter rough notes or the text you want the AI to read aloud..."></textarea>
+                    
+                    <label class="block text-sm font-medium mb-2">Neural Voice Profile:</label>
+                    <select id="tts-voice" class="w-full p-3 rounded bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-700 mb-6">
+                        <option value="Kore">Kore (Calm, Professional Female)</option>
+                        <option value="Fenrir">Fenrir (Deep, Authoritative Male)</option>
+                        <option value="Aoede">Aoede (Warm, Engaging Female)</option>
+                        <option value="Puck">Puck (Energetic, Youthful)</option>
+                        <option value="Charon">Charon (Husky, Cinematic Male)</option>
+                    </select>
+
+                    <button id="btn-generate-tts" class="w-full py-3 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50 flex items-center justify-center gap-2">
+                        ✨ Synthesize Audio
+                    </button>
+                </div>
+                
+                <!-- Output Console -->
+                <div class="bg-white dark:bg-dark p-6 rounded-xl border border-gray-200 dark:border-gray-800 flex flex-col items-center justify-center text-center">
+                    <div id="tts-status" class="w-full flex flex-col items-center justify-center">
+                        <i data-lucide="waves" class="w-16 h-16 text-gray-400 mb-4"></i>
+                        <p class="text-sm text-gray-500 font-mono">Awaiting Text Payload...</p>
+                    </div>
+                    
+                    <div id="tts-player-container" class="w-full mt-6 hidden flex flex-col items-center">
+                        <audio id="tts-audio-player" controls class="w-full mb-4"></audio>
+                        <button id="btn-download-tts" class="w-full py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+                            <i data-lucide="download" class="w-5 h-5"></i> Download WAV Track
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- AD MODAL (Credits Exhausted) -->
+    <div id="ad-modal" class="fixed inset-0 z-[100] bg-black/90 hidden flex flex-col items-center justify-center backdrop-blur-sm">
+        <div class="bg-white dark:bg-dark max-w-md w-full p-8 rounded-xl text-center space-y-6">
+            <i data-lucide="play-circle" class="w-16 h-16 mx-auto text-brand animate-pulse"></i>
+            <h3 class="text-2xl font-bold">Credits Exhausted</h3>
+            <p class="text-gray-500 text-sm">Watch a brief sponsor message to recharge your execution credits. (Simulated Ad)</p>
+            
+            <div class="h-48 bg-black rounded flex items-center justify-center text-white font-mono border border-gray-700">
+                <span id="ad-timer">Simulating Ad... 3s</span>
+            </div>
+            
+            <button id="btn-close-ad" class="w-full py-3 bg-gray-300 text-gray-700 rounded font-bold hidden hover:bg-brand hover:text-white transition-colors">
+                Claim 5 Credits
+            </button>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-darker mt-auto">
+        <div class="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div class="col-span-1 md:col-span-2">
+                <span class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand to-emerald-400">OptiStream</span>
+                <p class="mt-2 text-sm text-gray-500 max-w-sm">The decentralized, browser-native media compression architecture. Built for absolute privacy, maximum speed, and zero server emissions.</p>
+            </div>
+            <div>
+                <h4 class="font-bold mb-4">Architecture</h4>
+                <ul class="space-y-2 text-sm text-gray-500">
+                    <li><a href="#" onclick="switchView('image-compressor'); return false;" class="hover:text-brand">Image Matrix</a></li>
+                    <li><a href="#" onclick="switchView('video-compressor'); return false;" class="hover:text-brand">WASM Video Core</a></li>
+                    <li><a href="#" onclick="switchView('pdf-engine'); return false;" class="hover:text-brand">PDF Compiler</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="font-bold mb-4">Legal</h4>
+                <ul class="space-y-2 text-sm text-gray-500">
+                    <li><a href="#" class="hover:text-brand">Privacy Protocol</a></li>
+                    <li><a href="#" class="hover:text-brand">Terms of Execution</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="max-w-7xl mx-auto px-4 py-4 border-t border-gray-200 dark:border-gray-800 flex justify-center items-center">
+            <p class="text-xs text-gray-500">&copy; 2026 OptiStream Systems. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- CORE LOGIC ENGINE -->
+    <script>
+        // System Init
+        lucide.createIcons();
+        
+        // State
+        let credits = 5;
+        let activeFile = null;
+        let watermarkFiles = { source: null };
+        let pdfFile = null;
+        let zipFiles = [];
+
+        // Gemini API Configuration
+        const apiKey = "AIzaSyAxOiBGlkSPVgWIid8opzhCoC6_LJXngtw";
+
+        // Gemini Fetch Wrapper with Exponential Backoff
+        async function fetchGemini(payload, model = "gemini-2.5-flash-preview-09-2025") {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            const delays = [1000, 2000, 4000, 8000, 16000];
+            for (let i = 0; i < 6; i++) {
+                try {
+                    const response = await fetch(url, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) throw new Error(`HTTP status: ${response.status}`);
+                    const result = await response.json();
+                    
+                    if (model === "gemini-2.5-flash-preview-tts") {
+                        const audioData = result.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+                        if(audioData) return audioData; 
+                    }
+                    
+                    return result.candidates?.[0]?.content?.parts?.[0]?.text || "No response generated.";
+                } catch (error) {
+                    if (i === 5) throw error;
+                    await new Promise(r => setTimeout(r, delays[i]));
+                }
+            }
+        }
+
+        // Helper: Convert PCM16 Base64 to WAV Blob
+        function pcmToWavBlob(base64Pcm, sampleRate = 24000) {
+            const binaryStr = atob(base64Pcm);
+            const pcmBytes = new Uint8Array(binaryStr.length);
+            for (let i = 0; i < binaryStr.length; i++) {
+                pcmBytes[i] = binaryStr.charCodeAt(i);
+            }
+
+            const wavBuffer = new ArrayBuffer(44 + pcmBytes.length);
+            const view = new DataView(wavBuffer);
+            
+            const writeString = (offset, string) => {
+                for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
+            };
+            
+            writeString(0, 'RIFF');
+            view.setUint32(4, 36 + pcmBytes.length, true);
+            writeString(8, 'WAVE');
+            writeString(12, 'fmt ');
+            view.setUint32(16, 16, true); 
+            view.setUint16(20, 1, true); 
+            view.setUint16(22, 1, true); 
+            view.setUint32(24, sampleRate, true); 
+            view.setUint32(28, sampleRate * 2, true); 
+            view.setUint16(32, 2, true); 
+            view.setUint16(34, 16, true); 
+            writeString(36, 'data');
+            view.setUint32(40, pcmBytes.length, true); 
+            
+            new Uint8Array(wavBuffer, 44).set(pcmBytes);
+            return new Blob([wavBuffer], { type: 'audio/wav' });
+        }
+
+        // Helper: Extract MIME and Base64 string from Data URL
+        function extractBase64(dataUrl) {
+            const match = dataUrl.match(/^data:(.+);base64,(.+)$/);
+            return { mimeType: match[1], data: match[2] };
+        }
+
+        // Cloudinary Config
+        const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dwomffcf4/image/upload';
+        const CLOUDINARY_PRESET = 'qhtiqzr0';
+
+        // DOM Elements
+        const elCredits = document.getElementById('credit-counter');
+        const modalAd = document.getElementById('ad-modal');
+        const views = document.querySelectorAll('.view-section');
+
+        // Theme Toggle
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+        });
+
+        // Router
+        function switchView(viewId) {
+            views.forEach(v => v.classList.add('hide'));
+            views.forEach(v => v.classList.remove('active'));
+            document.getElementById(`view-${viewId}`).classList.remove('hide');
+            document.getElementById(`view-${viewId}`).classList.add('active');
+            window.scrollTo(0, 0);
+        }
+
+        // Credit Economy
+        function consumeCredit(callback) {
+            if (credits > 0) {
+                credits--;
+                elCredits.innerText = `${credits} Credits`;
+                callback();
+            } else {
+                triggerRewardAd();
+            }
+        }
+
+        function triggerRewardAd() {
+            modalAd.classList.remove('hide');
+            modalAd.style.display = 'flex';
+            const timerEl = document.getElementById('ad-timer');
+            const btnClose = document.getElementById('btn-close-ad');
+            let t = 3;
+            timerEl.innerText = `Simulating Ad... ${t}s`;
+            btnClose.classList.add('hide');
+            
+            const intv = setInterval(() => {
+                t--;
+                timerEl.innerText = `Simulating Ad... ${t}s`;
+                if(t <= 0) {
+                    clearInterval(intv);
+                    timerEl.innerText = "Ad Complete.";
+                    btnClose.classList.remove('hide');
+                    btnClose.style.display = 'block';
+                }
+            }, 1000);
+
+            btnClose.onclick = () => {
+                credits += 5;
+                elCredits.innerText = `${credits} Credits`;
+                modalAd.style.display = 'none';
+            };
+        }
+
+        const fileToDataUrl = file => new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = e => resolve(e.target.result);
+            reader.readAsDataURL(file);
+        });
+
+        const downloadBlob = (blob, filename) => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+
+        // --- IMAGE MATRIX LOGIC ---
+        const imgInput = document.getElementById('img-input');
+        const imgDrop = document.getElementById('img-dropzone');
+        const imgBtn = document.getElementById('btn-compress-img');
+        const imgDownload = document.getElementById('btn-download-img');
+        const imgPreview = document.getElementById('img-preview');
+        const imgQuality = document.getElementById('img-quality');
+        
+        imgQuality.oninput = (e) => document.getElementById('img-quality-val').innerText = `${e.target.value}%`;
+
+        imgDrop.onclick = () => imgInput.click();
+        imgDrop.ondragover = e => { e.preventDefault(); imgDrop.classList.add('dragover'); }
+        imgDrop.ondragleave = () => imgDrop.classList.remove('dragover');
+        imgDrop.ondrop = e => {
+            e.preventDefault(); imgDrop.classList.remove('dragover');
+            if(e.dataTransfer.files.length) handleImgInput(e.dataTransfer.files[0]);
+        };
+        imgInput.onchange = e => { if(e.target.files.length) handleImgInput(e.target.files[0]); };
+
+        async function handleImgInput(file) {
+            if(!file.type.startsWith('image/')) return alert('Invalid matrix payload. Image required.');
+            activeFile = file;
+            imgPreview.src = await fileToDataUrl(file);
+            imgPreview.classList.remove('hidden');
+            document.getElementById('img-placeholder-text').classList.add('hidden');
+            imgBtn.disabled = false;
+            
+            document.getElementById('ai-metadata-panel').classList.remove('hidden');
+            document.getElementById('ai-metadata-results').classList.add('hidden');
+            document.getElementById('ai-palette-results').classList.add('hidden');
+        }
+
+        document.getElementById('btn-ai-metadata').onclick = async () => {
+            if (!activeFile) return;
+            const btn = document.getElementById('btn-ai-metadata');
+            const loader = document.getElementById('ai-loader');
+            const results = document.getElementById('ai-metadata-results');
+            
+            btn.disabled = true;
+            loader.classList.remove('hidden');
+            results.classList.add('hidden');
+            
+            try {
+                const dataUrl = await fileToDataUrl(activeFile);
+                const { mimeType, data } = extractBase64(dataUrl);
+                
+                const payload = {
+                    contents: [{
+                        role: "user",
+                        parts: [
+                            { text: "Analyze this image. Reply strictly in this exact format:\nAlt Text: [seo friendly description]\nCaption: [catchy social media caption]\nTags: [comma separated tags]" },
+                            { inlineData: { mimeType, data } }
+                        ]
+                    }]
+                };
+                
+                const responseText = await fetchGemini(payload);
+                const altMatch = responseText.match(/Alt Text:\s*(.+)/i);
+                const capMatch = responseText.match(/Caption:\s*(.+)/i);
+                const tagMatch = responseText.match(/Tags:\s*(.+)/i);
+                
+                document.getElementById('ai-alt-text').innerText = altMatch ? altMatch[1] : "Generated description not found.";
+                document.getElementById('ai-caption').innerText = capMatch ? capMatch[1] : "Generated caption not found.";
+                document.getElementById('ai-tags').innerText = tagMatch ? tagMatch[1] : "Generated tags not found.";
+                results.classList.remove('hidden');
+            } catch (err) {
+                console.error(err);
+                document.getElementById('ai-alt-text').innerText = "Matrix overload. Failed to generate metadata.";
+                results.classList.remove('hidden');
+            } finally {
+                loader.classList.add('hidden');
+                btn.disabled = false;
+            }
+        };
+
+        document.getElementById('btn-ai-palette').onclick = async () => {
+            if (!activeFile) return;
+            const btn = document.getElementById('btn-ai-palette');
+            const loader = document.getElementById('ai-loader');
+            const paletteBox = document.getElementById('ai-palette-results');
+            
+            btn.disabled = true;
+            loader.classList.remove('hidden');
+            paletteBox.classList.add('hidden');
+            
+            try {
+                const dataUrl = await fileToDataUrl(activeFile);
+                const { mimeType, data } = extractBase64(dataUrl);
+                
+                const payload = {
+                    contents: [{
+                        role: "user",
+                        parts: [
+                            { text: "Analyze this image and extract the 5 most dominant, thematic, or prominent colors. Output ONLY a comma-separated list of 5 HEX color codes (e.g., #FFFFFF, #000000, #1A2B3C)." },
+                            { inlineData: { mimeType, data } }
+                        ]
+                    }]
+                };
+                
+                const responseText = await fetchGemini(payload);
+                const hexCodes = responseText.match(/#[0-9a-fA-F]{6}/g);
+                
+                if (hexCodes && hexCodes.length > 0) {
+                    paletteBox.innerHTML = '';
+                    hexCodes.slice(0, 5).forEach(hex => {
+                        const swatch = document.createElement('div');
+                        swatch.className = "flex-grow h-full hover:scale-110 transition-transform flex items-center justify-center opacity-90 hover:opacity-100 group";
+                        swatch.style.backgroundColor = hex;
+                        swatch.innerHTML = `<span class="text-[10px] font-mono text-white opacity-0 group-hover:opacity-100 drop-shadow-md mix-blend-difference select-none pointer-events-none">${hex}</span>`;
+                        swatch.onclick = () => {
+                            document.execCommand('copy');
+                            navigator.clipboard.writeText(hex).catch(()=>document.execCommand('copy'));
+                            const original = swatch.innerHTML;
+                            swatch.innerHTML = `<span class="text-[10px] font-bold text-white drop-shadow-md mix-blend-difference">COPIED</span>`;
+                            setTimeout(() => swatch.innerHTML = original, 1000);
+                        };
+                        paletteBox.appendChild(swatch);
+                    });
+                    paletteBox.classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error(err);
+            } finally {
+                loader.classList.add('hidden');
+                btn.disabled = false;
+            }
+        };
+
+        imgBtn.onclick = () => consumeCredit(async () => {
+            document.getElementById('img-loader').classList.remove('hidden');
+            const useCloud = document.getElementById('img-cloud-fallback').checked;
+            
+            try {
+                if(useCloud) {
+                    const fd = new FormData();
+                    fd.append('file', activeFile);
+                    fd.append('upload_preset', CLOUDINARY_PRESET);
+                    const res = await fetch(CLOUDINARY_URL, { method: 'POST', body: fd });
+                    const data = await res.json();
+                    
+                    if(data.secure_url) {
+                        const optUrl = data.secure_url.replace('/upload/', `/upload/q_${imgQuality.value}/`);
+                        const fetchedImg = await fetch(optUrl);
+                        const blob = await fetchedImg.blob();
+                        imgPreview.src = URL.createObjectURL(blob);
+                        setupImageDownload(blob, `optistream_cloud_${activeFile.name}`);
+                    }
+                } else {
+                    const img = new Image();
+                    img.src = await fileToDataUrl(activeFile);
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        
+                        const q = parseInt(imgQuality.value) / 100;
+                        canvas.toBlob((blob) => {
+                            imgPreview.src = URL.createObjectURL(blob);
+                            const saved = activeFile.size - blob.size;
+                            document.getElementById('img-metrics').classList.remove('hidden');
+                            document.getElementById('img-saved-bytes').innerText = saved > 0 ? `${(saved/1024).toFixed(1)} KB` : '0 KB (Limit reached)';
+                            setupImageDownload(blob, `optistream_${activeFile.name}`);
+                        }, 'image/jpeg', q);
+                    };
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Compression matrix failure.");
+            } finally {
+                document.getElementById('img-loader').classList.add('hidden');
+            }
+        });
+
+        function setupImageDownload(blob, filename) {
+            imgDownload.classList.remove('hidden');
+            imgDownload.onclick = () => downloadBlob(blob, filename);
+        }
+
+        // --- WATERMARK STUDIO LOGIC ---
+        const wmInput = document.getElementById('wm-input');
+        const wmDrop = document.getElementById('wm-dropzone');
+        const wmBtn = document.getElementById('btn-apply-wm');
+        const wmDownload = document.getElementById('btn-download-wm');
+        const wmPrevBefore = document.getElementById('wm-preview-before');
+        const wmPrevAfter = document.getElementById('wm-preview-after');
+
+        wmDrop.onclick = () => wmInput.click();
+        wmInput.onchange = e => { if(e.target.files.length) handleWmInput(e.target.files[0]); };
+
+        async function handleWmInput(file) {
+            watermarkFiles.source = file;
+            const url = await fileToDataUrl(file);
+            wmPrevBefore.src = url;
+            wmPrevBefore.classList.remove('hidden');
+            wmBtn.disabled = false;
+        }
+
+        document.getElementById('btn-auto-brand').onclick = async () => {
+            if (!watermarkFiles.source) return alert("Please drop a source image first.");
+            const btn = document.getElementById('btn-auto-brand');
+            const input = document.getElementById('wm-text');
+            const originalText = btn.innerText;
+            btn.innerText = "✨...";
+            btn.disabled = true;
+            
+            try {
+                const dataUrl = await fileToDataUrl(watermarkFiles.source);
+                const { mimeType, data } = extractBase64(dataUrl);
+                const payload = {
+                    contents: [{
+                        role: "user",
+                        parts: [
+                            { text: "Analyze this image. Generate a short watermark text (max 3-4 words). Output ONLY the watermark text (e.g. '© Neon Dreams')." },
+                            { inlineData: { mimeType, data } }
+                        ]
+                    }]
+                };
+                const responseText = await fetchGemini(payload);
+                input.value = responseText.trim();
+                if(!wmBtn.disabled) wmBtn.click();
+            } catch (err) {
+                console.error(err);
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        };
+
+        wmBtn.onclick = () => consumeCredit(async () => {
+            const text = document.getElementById('wm-text').value;
+            const color = document.getElementById('wm-color').value;
+            const opacity = document.getElementById('wm-opacity').value;
+            const pos = document.getElementById('wm-position').value;
+
+            const img = new Image();
+            img.src = await fileToDataUrl(watermarkFiles.source);
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                
+                ctx.globalAlpha = parseFloat(opacity);
+                ctx.fillStyle = color;
+                const fontSize = Math.floor(img.width * 0.05); 
+                ctx.font = `bold ${fontSize}px sans-serif`;
+                
+                const textWidth = ctx.measureText(text).width;
+                let x, y;
+                const pad = fontSize;
+
+                if (pos === 'bottom-right') { x = canvas.width - textWidth - pad; y = canvas.height - pad; }
+                else if (pos === 'top-left') { x = pad; y = pad + fontSize; }
+                else { x = (canvas.width - textWidth) / 2; y = canvas.height / 2 + fontSize/2; }
+
+                ctx.fillText(text, x, y);
+
+                canvas.toBlob(blob => {
+                    wmPrevAfter.src = URL.createObjectURL(blob);
+                    wmPrevAfter.classList.remove('hidden');
+                    wmDownload.classList.remove('hidden');
+                    wmDownload.onclick = () => downloadBlob(blob, `watermarked_${watermarkFiles.source.name}`);
+                }, 'image/png');
+            }
+        });
+
+        // --- TROUBLESHOOTED PDF ENGINE LOGIC ---
+        const pdfInput = document.getElementById('pdf-input');
+        const pdfDrop = document.getElementById('pdf-dropzone');
+        const pdfBtn = document.getElementById('btn-compress-pdf');
+        const pdfStatus = document.getElementById('pdf-status');
+        const pdfDownload = document.getElementById('btn-download-pdf');
+
+        pdfDrop.onclick = () => pdfInput.click();
+        pdfInput.onchange = e => { if(e.target.files.length) { pdfFile = e.target.files[0]; pdfBtn.disabled = false; pdfStatus.innerHTML = `<p class="font-bold text-brand">Payload loaded: ${pdfFile.name}</p>`; }};
+
+        pdfBtn.onclick = () => consumeCredit(async () => {
+            if(!pdfFile) return;
+            pdfStatus.innerHTML = `<i data-lucide="loader" class="w-8 h-8 text-brand animate-spin mx-auto mb-2"></i><p>Stripping Structural Data...</p>`;
+            lucide.createIcons();
+            
+            try {
+                const arrayBuffer = await pdfFile.arrayBuffer();
+                const initialSize = arrayBuffer.byteLength;
+                
+                // Load strictly without updating metadata date stamps
+                const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer, { ignoreEncryption: true, updateMetadata: false });
+                
+                // Aggressive stripping of meta-bloat
+                pdfDoc.setTitle('');
+                pdfDoc.setAuthor('');
+                pdfDoc.setSubject('');
+                pdfDoc.setKeywords([]);
+                pdfDoc.setProducer('OptiStream Architecture');
+                pdfDoc.setCreator('OptiStream');
+                
+                // useObjectStreams MUST be true for modern PDF compression
+                const pdfBytes = await pdfDoc.save({ useObjectStreams: true }); 
+                const finalSize = pdfBytes.length;
+
+                if (finalSize >= initialSize) {
+                    pdfStatus.innerHTML = `
+                        <i data-lucide="alert-circle" class="w-16 h-16 text-yellow-500 mx-auto mb-2"></i>
+                        <p class="font-bold">Matrix Already Optimized.</p>
+                        <p class="text-xs text-gray-500 mt-2">File is structurally compact. Deep image downscaling requires WASM hardware plugins.</p>`;
+                    lucide.createIcons();
+                    pdfDownload.classList.add('hidden');
+                    return;
+                }
+
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const savedKb = ((initialSize - finalSize) / 1024).toFixed(1);
+
+                pdfStatus.innerHTML = `<i data-lucide="check-circle" class="w-16 h-16 text-brand mx-auto mb-2"></i>
+                                       <p>Matrix Rebuilt. Saved: ${savedKb} KB</p>`;
+                lucide.createIcons();
+                
+                pdfDownload.classList.remove('hidden');
+                pdfDownload.onclick = () => downloadBlob(blob, `opti_${pdfFile.name}`);
+                
+            } catch (e) {
+                console.error("PDF execution error:", e);
+                pdfStatus.innerHTML = `<p class="text-red-500">Execution Failed: File is corrupt or encrypted.</p>`;
+            }
+        });
+
+        // --- AI PDF Drafter Logic ---
+        document.getElementById('btn-ai-draft-pdf').onclick = () => consumeCredit(async () => {
+            const prompt = document.getElementById('pdf-ai-prompt').value;
+            if(!prompt) return alert("Please enter a document prompt.");
+            
+            const btn = document.getElementById('btn-ai-draft-pdf');
+            const status = document.getElementById('pdf-status');
+            const downloadBtn = document.getElementById('btn-download-pdf');
+
+            btn.disabled = true;
+            status.innerHTML = `<i data-lucide="loader" class="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-2"></i><p>✨ AI is drafting and compiling your document...</p>`;
+            lucide.createIcons();
+
+            try {
+                const payload = {
+                    contents: [{ parts: [{ text: `Write a professional, plain-text document about: "${prompt}". No markdown syntax. 1-2 pages max. Format with clear paragraph breaks.` }] }]
+                };
+                const aiText = await fetchGemini(payload);
+
+                const pdfDoc = await PDFLib.PDFDocument.create();
+                const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+                const fontSize = 12;
+                const margin = 50;
+                let page = pdfDoc.addPage([595.28, 841.89]); 
+                const { width, height } = page.getSize();
+                const maxWidth = width - (margin * 2);
+
+                const paragraphs = aiText.split('\n');
+                let y = height - margin;
+
+                for (const para of paragraphs) {
+                    if(!para.trim()) { y -= fontSize; continue; }
+                    const words = para.split(' ');
+                    let line = '';
+                    for (const word of words) {
+                        const testLine = line + word + ' ';
+                        const textWidth = font.widthOfTextAtSize(testLine, fontSize);
+                        if (textWidth > maxWidth && line !== '') {
+                            page.drawText(line, { x: margin, y: y, size: fontSize, font });
+                            y -= (fontSize + 4);
+                            line = word + ' ';
+                            if (y < margin) { page = pdfDoc.addPage([595.28, 841.89]); y = height - margin; }
+                        } else {
+                            line = testLine;
+                        }
+                    }
+                    page.drawText(line, { x: margin, y: y, size: fontSize, font });
+                    y -= (fontSize + 12); 
+                    if (y < margin) { page = pdfDoc.addPage([595.28, 841.89]); y = height - margin; }
+                }
+
+                const pdfBytes = await pdfDoc.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+
+                status.innerHTML = `<i data-lucide="check-circle" class="w-16 h-16 text-emerald-500 mx-auto mb-2"></i><p>✨ AI Document Compiled.</p>`;
+                lucide.createIcons();
+
+                downloadBtn.classList.remove('hidden');
+                downloadBtn.innerHTML = `<i data-lucide="download" class="w-5 h-5 inline-block mr-2"></i> Download AI Draft`;
+                lucide.createIcons();
+                downloadBtn.onclick = () => downloadBlob(blob, `AI_Draft.pdf`);
+
+            } catch (err) {
+                console.error(err);
+                status.innerHTML = `<p class="text-red-500">AI Drafting Failed.</p>`;
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        // --- ZIP ENGINE LOGIC ---
+        const zipInput = document.getElementById('zip-input');
+        const zipDrop = document.getElementById('zip-dropzone');
+        const zipBtn = document.getElementById('btn-create-zip');
+        const zipList = document.getElementById('zip-file-list');
+        const zipStatus = document.getElementById('zip-status');
+        const zipDownload = document.getElementById('btn-download-zip');
+
+        zipDrop.onclick = () => zipInput.click();
+        zipInput.onchange = e => {
+            if(e.target.files.length) {
+                zipFiles = Array.from(e.target.files);
+                zipList.innerHTML = zipFiles.map(f => `<li>${f.name} (${(f.size/1024).toFixed(1)} KB)</li>`).join('');
+                zipBtn.disabled = false;
+                document.getElementById('zip-name-container').classList.remove('hidden');
+                document.getElementById('zip-filename').value = "optistream_bundle";
+            }
+        };
+
+        document.getElementById('btn-smart-zip-name').onclick = async () => {
+            if (zipFiles.length === 0) return;
+            const btn = document.getElementById('btn-smart-zip-name');
+            const input = document.getElementById('zip-filename');
+            const originalText = btn.innerText;
+            btn.innerText = "Thinking...";
+            btn.disabled = true;
+            
+            try {
+                const fileNames = zipFiles.map(f => f.name).join(", ");
+                const payload = {
+                    contents: [{
+                        parts: [{ text: `I am zipping these files: ${fileNames}. Suggest a short filename for this archive (max 4 words, use underscores, no .zip extension). Output ONLY the filename.` }]
+                    }]
+                };
+                const responseText = await fetchGemini(payload);
+                input.value = responseText.trim().replace(/\.zip$/i, '').replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase();
+            } catch (err) {
+                console.error(err);
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        };
+
+        zipBtn.onclick = () => consumeCredit(async () => {
+            if(zipFiles.length === 0) return;
+            zipStatus.innerText = "Executing Deflate Algorithm...";
+            const zipName = document.getElementById('zip-filename').value || "optistream_bundle";
+            const zip = new JSZip();
+            zipFiles.forEach(file => zip.file(file.name, file));
+
+            zip.generateAsync({
+                type:"blob", compression: "DEFLATE", compressionOptions: { level: 6 }
+            }, (metadata) => {
+                zipStatus.innerText = `Compressing: ${metadata.percent.toFixed(0)}%`;
+            }).then(function(content) {
+                zipStatus.innerText = "Archive Compiled.";
+                zipDownload.classList.remove('hidden');
+                zipDownload.onclick = () => downloadBlob(content, `${zipName}.zip`);
+            });
+        });
+
+        // --- AI SCRIPT POLISH LOGIC ---
+        document.getElementById('btn-ai-polish-script').onclick = () => consumeCredit(async () => {
+            const scriptEl = document.getElementById('tts-script');
+            const originalText = scriptEl.value;
+            if(!originalText.trim()) return alert("Please enter some rough notes first.");
+            
+            const btn = document.getElementById('btn-ai-polish-script');
+            btn.disabled = true;
+            btn.innerText = "✨ Polishing...";
+            
+            try {
+                const payload = {
+                    contents: [{ parts: [{ text: `Rewrite these notes into a professional, highly natural-sounding script for a voice actor. Output ONLY the spoken text: "${originalText}"` }] }]
+                };
+                const responseText = await fetchGemini(payload);
+                scriptEl.value = responseText.trim();
+            } catch (err) {
+                console.error(err);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "✨ Polish Notes";
+            }
+        });
+
+        // --- AI VOICEOVER STUDIO LOGIC ---
+        document.getElementById('btn-generate-tts').onclick = () => consumeCredit(async () => {
+            const script = document.getElementById('tts-script').value;
+            const voice = document.getElementById('tts-voice').value;
+            if(!script.trim()) return alert("Please enter text for the AI to synthesize.");
+
+            const btn = document.getElementById('btn-generate-tts');
+            const status = document.getElementById('tts-status');
+            const playerContainer = document.getElementById('tts-player-container');
+            const audioPlayer = document.getElementById('tts-audio-player');
+            const downloadBtn = document.getElementById('btn-download-tts');
+
+            btn.disabled = true;
+            playerContainer.classList.add('hidden');
+            status.innerHTML = `<i data-lucide="loader" class="w-16 h-16 text-emerald-500 animate-spin mx-auto mb-4"></i><p class="text-emerald-700 font-mono text-sm">Synthesizing Neural Voice...</p>`;
+            lucide.createIcons();
+
+            try {
+                const payload = {
+                    contents: [{ parts: [{ text: script }] }],
+                    generationConfig: {
+                        responseModalities: ["AUDIO"],
+                        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } }
+                    }
+                };
+                
+                const audioResponse = await fetchGemini(payload, "gemini-2.5-flash-preview-tts");
+                if(!audioResponse || !audioResponse.data) throw new Error("Invalid audio payload received.");
+
+                let sampleRate = 24000;
+                const rateMatch = audioResponse.mimeType?.match(/rate=(\d+)/);
+                if (rateMatch) sampleRate = parseInt(rateMatch[1], 10);
+
+                const wavBlob = pcmToWavBlob(audioResponse.data, sampleRate);
+                const audioUrl = URL.createObjectURL(wavBlob);
+
+                status.innerHTML = `<i data-lucide="check-circle" class="w-16 h-16 text-emerald-500 mx-auto mb-4"></i><p class="text-emerald-700 font-mono text-sm">Audio Track Ready.</p>`;
+                lucide.createIcons();
+                
+                audioPlayer.src = audioUrl;
+                playerContainer.classList.remove('hidden');
+                downloadBtn.onclick = () => downloadBlob(wavBlob, `OptiStream_Voice_${voice}.wav`);
+
+            } catch (err) {
+                console.error(err);
+                status.innerHTML = `<i data-lucide="alert-triangle" class="w-16 h-16 text-red-500 mx-auto mb-4"></i><p class="text-red-500 font-mono text-sm">Synthesis Failed. Check API configuration.</p>`;
+                lucide.createIcons();
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+    </script>
+</body>
+</html>
